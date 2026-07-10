@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Population & Demographics | Nigeria Election GIS Dashboard</title>
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="dashboard-page">
+    <aside class="side-nav">
+      <a class="side-brand" href="index.html">
+        <img src="assets/geoinfotech-logo.jpeg" alt="GEOINFOTECH logo" />
+        <span>
+          <strong>Nigeria</strong>
+          <small>Election GIS</small>
+        </span>
+      </a>
+
+      <nav aria-label="Dashboard pages">
+        <a href="index.html">Overview</a>
+        <a class="active" href="population.html">Population &amp; Demographics</a>
+        <a href="polling-units.html">Polling Units &amp; Accessibility</a>
+        <a href="political.html">Political &amp; Election Intelligence</a>
+      </nav>
+      <section class="filter-bar" aria-label="Population map filters">
+        <label>
+          Search
+          <input
+            id="areaSearchInput"
+            type="search"
+            placeholder="State or LGA name"
+            autocomplete="off"
+          />
+        </label>
+        <button id="areaSearchButton" type="button">Search Map</button>
+        <p id="areaSearchMessage" class="filter-message" role="status"></p>
+
+        <label>
+          View by
+          <select id="levelSelect">
+            <option value="state">State</option>
+            <option value="lga">LGA</option>
+            <option value="country">Country</option>
+          </select>
+        </label>
+
+        <label>
+          State
+          <select id="stateSelect">
+            <option value="">All States</option>
+          </select>
+        </label>
+
+        <label>
+          LGA
+          <select id="lgaSelect">
+            <option value="">All LGAs</option>
+          </select>
+        </label>
+
+        <button id="applyFilters" type="button">Apply Filter</button>
+        <button id="resetFilters" class="secondary-button" type="button">Reset</button>
+      </section>
+    </aside>
+
+    <main class="dashboard-main">
+      <header class="dashboard-header">
+        <div>
+          <h1>Population &amp; Demographics</h1>
+        </div>
+        <a class="header-button" href="index.html" aria-label="Back to Election Dashboard">
+          Back to Homepage
+        </a>
+      </header>
+
+      <section class="population-grid">
+        <div class="map-panel">
+          <div id="populationMap" aria-label="Nigeria population boundary map"></div>
+          <div class="map-legend">
+            <strong>Boundary Level</strong>
+            <span><i class="legend-country"></i> Nigeria</span>
+            <span><i class="legend-state"></i> State</span>
+            <span><i class="legend-lga"></i> LGA</span>
+          </div>
+          <div class="map-legend-dock" id="mapLegendDock" aria-label="Population and voters legend"></div>
+        </div>
+
+        <button
+          id="panelResizer"
+          class="panel-resizer"
+          type="button"
+          aria-label="Resize details panel"
+          title="Drag to resize details panel"
+        ></button>
+
+        <aside class="insight-panel">
+          <div class="insight-scroll">
+            <section id="africaLocatorCard" class="africa-locator-card is-hidden" aria-label="Nigeria location in Africa">
+              <h2>Nigeria in Africa</h2>
+              <div id="africaLocatorMap" class="africa-locator-map"></div>
+            </section>
+
+            <section class="stat-card insight-area-card">
+              <span id="selectedAreaLabel">Selected Area</span>
+              <strong id="selectedAreaName">Nigeria</strong>
+            </section>
+
+            <section class="stats-footer" id="statsFooter" aria-label="Area analytics">
+              <h2>Area Analytics</h2>
+              <section class="stat-card">
+                <span id="populationLabel">Population</span>
+                <strong id="populationValue">216,746,934</strong>
+              </section>
+              <section class="stat-card">
+                <span id="registeredVotersLabel">Registered Voters</span>
+                <strong id="registeredVotersValue">--</strong>
+              </section>
+              <section class="stat-card">
+                <span id="voterRatioLabel">Voter / Pop. Ratio</span>
+                <strong id="voterRatioValue">--</strong>
+              </section>
+              <section class="stat-card">
+                <span id="collectedPVCLabel">Collected PVCs</span>
+                <strong id="collectedPVCValue">--</strong>
+              </section>
+              <section class="stat-card">
+                <span id="pvcRateLabel">PVC Collection Rate</span>
+                <strong id="pvcRateValue">--</strong>
+              </section>
+              <section class="stat-card">
+                <span id="uncollectedPVCLabel">Uncollected PVCs</span>
+                <strong id="uncollectedPVCValue" class="stat-warn">--</strong>
+              </section>
+              <section class="stat-card">
+                <span id="governorPartyLabel">Governor / Party</span>
+                <strong id="governorPartyValue">--</strong>
+              </section>
+              <section class="stat-card">
+                <span id="geopoliticalZoneLabel">Geopolitical Zone</span>
+                <strong id="geopoliticalZoneValue">--</strong>
+              </section>
+              <section class="stat-card">
+                <span id="coverageLabel">Administrative Coverage</span>
+                <strong id="coverageCount">Loading...</strong>
+              </section>
+            </section>
+
+            <section id="pvcChartCard" class="chart-card">
+              <h2 id="chartTitle">PVC Collection Status</h2>
+              <div id="pvcDonut" class="donut-chart" aria-hidden="true"></div>
+              <dl>
+                <div><dt>Collected</dt><dd id="collectedLegend">--</dd></div>
+                <div><dt>Uncollected</dt><dd id="uncollectedLegend">--</dd></div>
+              </dl>
+              <button id="downloadReport" class="report-button" type="button">
+                Download PDF Report
+              </button>
+            </section>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/shpjs/shp.min.js"></script>
+    <script src="vendor/jspdf/jspdf.umd.min.js"></script>
+    <script src="vendor/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
+    <script src="vendor/chart.js/chart.umd.min.js"></script>
+    <script src="theme.js"></script>
+    <script src="population.js"></script>
+  </body>
+</html>

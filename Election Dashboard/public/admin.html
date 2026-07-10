@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin | Nigeria Election GIS Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="dashboard-page admin-page">
+    <aside class="side-nav">
+      <a class="side-brand" href="index.html">
+        <img src="assets/geoinfotech-logo.jpeg" alt="GEOINFOTECH logo" />
+        <span>
+          <strong>Nigeria</strong>
+          <small>Election GIS</small>
+        </span>
+      </a>
+
+      <nav aria-label="Admin navigation">
+        <a href="index.html">Overview</a>
+        <a href="population.html">Population Dashboard</a>
+        <a class="active" href="admin.html">Admin</a>
+      </nav>
+    </aside>
+
+    <main class="dashboard-main admin-main">
+      <header class="dashboard-header">
+        <div>
+          <span class="page-kicker">Admin Console</span>
+          <h1>Data Management</h1>
+        </div>
+        <button id="logoutButton" class="header-button" type="button">Sign Out</button>
+      </header>
+
+      <section class="admin-status-strip">
+        <div>
+          <span>Access</span>
+          <strong id="adminEmail">Authenticated admin</strong>
+        </div>
+        <div>
+          <span>Population source</span>
+          <strong id="sourceSummary">Checking...</strong>
+        </div>
+      </section>
+
+      <section class="admin-layout">
+        <article class="admin-card">
+          <div class="admin-card-header">
+            <div>
+              <span class="page-kicker">Google Drive</span>
+              <h2>Update Dashboard Data</h2>
+            </div>
+            <div class="admin-card-actions">
+              <button id="refreshDriveFiles" class="secondary-button" type="button">Refresh Folder Files</button>
+              <button id="useLocalButton" class="secondary-button" type="button">Use Local Data</button>
+            </div>
+          </div>
+
+          <form id="driveSearchForm" class="admin-form">
+            <label>
+              Search Election Dashboard folders
+              <input
+                id="driveSearchInput"
+                type="search"
+                placeholder="population, pvc, election..."
+                autocomplete="off"
+              />
+            </label>
+            <button type="submit">Search</button>
+          </form>
+
+          <div id="searchMessage" class="admin-message" role="status"></div>
+          <p class="sync-status" data-state="active">
+            Selecting or updating a Drive file reconnects open Population dashboard tabs for 15 minutes.
+          </p>
+          <div id="driveResults" class="drive-results"></div>
+        </article>
+
+        <article class="admin-card">
+          <div class="admin-card-header">
+            <div>
+              <span class="page-kicker">Current Source</span>
+              <h2>Active Population File</h2>
+            </div>
+          </div>
+
+          <dl class="source-details">
+            <div><dt>Mode</dt><dd id="sourceMode">--</dd></div>
+            <div><dt>Name</dt><dd id="sourceName">--</dd></div>
+            <div><dt>File ID</dt><dd id="sourceFileId">--</dd></div>
+            <div><dt>Updated By</dt><dd id="sourceUpdatedBy">--</dd></div>
+            <div><dt>Updated At</dt><dd id="sourceUpdatedAt">--</dd></div>
+          </dl>
+        </article>
+      </section>
+    </main>
+
+    <script src="theme.js"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>

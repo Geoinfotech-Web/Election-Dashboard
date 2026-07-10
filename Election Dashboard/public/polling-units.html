@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Polling Units &amp; Accessibility | Nigeria Election GIS Dashboard</title>
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="dashboard-page polling-page">
+    <div id="pollingGuideModal" class="polling-guide-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="pollingGuideTitle">
+      <div class="polling-guide-card">
+        <h2 id="pollingGuideTitle">How to view polling units</h2>
+        <p>To see polling units on the map, start by choosing a state and then choose a local government area. Once both are selected, the matching polling units will appear.</p>
+        <div class="polling-guide-steps">
+          <span>1. Select a state</span>
+          <span>2. Select an LGA</span>
+          <span>3. View the polling units</span>
+        </div>
+        <button id="pollingGuideClose" type="button">Got it</button>
+      </div>
+    </div>
+
+    <aside class="side-nav">
+      <a class="side-brand" href="index.html">
+        <img src="assets/geoinfotech-logo.jpeg" alt="GEOINFOTECH logo" />
+        <span>
+          <strong>Nigeria</strong>
+          <small>Election GIS</small>
+        </span>
+      </a>
+
+      <nav aria-label="Dashboard pages">
+        <a href="index.html">Overview</a>
+        <a href="population.html">Population &amp; Demographics</a>
+        <a class="active" href="polling-units.html">Polling Units &amp; Accessibility</a>
+        <a href="political.html">Political &amp; Election Intelligence</a>
+      </nav>
+
+      <section class="filter-bar" aria-label="Polling unit filters">
+        <label>
+          Search
+          <input
+            id="pollingSearchInput"
+            type="search"
+            placeholder="State or LGA name"
+            autocomplete="off"
+          />
+        </label>
+        <button id="pollingSearchButton" type="button">Search Map</button>
+        <p id="pollingSearchMessage" class="filter-message" role="status"></p>
+
+        <label>
+          State
+          <select id="pollingStateSelect">
+            <option value="">All States</option>
+          </select>
+        </label>
+
+        <label>
+          LGA
+          <select id="pollingLgaSelect">
+            <option value="">All LGAs</option>
+          </select>
+        </label>
+
+        <label>
+          Metric
+          <select id="pollingMetricSelect">
+            <option value="pollingUnits">Polling Units</option>
+            <option value="pollingUnitsPer100k">Polling Units per 100k</option>
+            <option value="populationPerPollingUnit">Population per Polling Unit</option>
+            <option value="accessibilityScore">Accessibility Score</option>
+          </select>
+        </label>
+
+        <button id="applyPollingFilters" type="button">Apply Filter</button>
+        <button id="resetPollingFilters" class="secondary-button" type="button">Reset</button>
+
+        <button id="locateMeButton" type="button" class="locate-me-button">
+          <svg class="locate-spinner" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="25 13" />
+          </svg>
+          <svg class="locate-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <line x1="12" y1="2" x2="12" y2="6"/>
+            <line x1="12" y1="18" x2="12" y2="22"/>
+            <line x1="2" y1="12" x2="6" y2="12"/>
+            <line x1="18" y1="12" x2="22" y2="12"/>
+          </svg>
+          Locate Me
+        </button>
+        <p id="locateMeMessage" class="filter-message" role="status"></p>
+
+        <fieldset class="layer-toggles">
+          <legend>Map Layers</legend>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleStates" checked />
+            <span class="toggle-indicator"></span>
+            States
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleWards" checked />
+            <span class="toggle-indicator"></span>
+            Wards
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="togglePollingUnits" checked />
+            <span class="toggle-indicator"></span>
+            Polling Units
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleUserLocation" />
+            <span class="toggle-indicator"></span>
+            User Location
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleNearestRoute" />
+            <span class="toggle-indicator"></span>
+            Nearest Route
+          </label>
+        </fieldset>
+      </section>
+    </aside>
+
+    <main class="dashboard-main">
+      <header class="dashboard-header">
+        <div>
+          <h1>Polling Units &amp; Accessibility</h1>
+          <p id="pollingSourceSummary" class="polling-source-summary">Loading polling unit data…</p>
+        </div>
+        <a class="header-button" href="index.html" aria-label="Back to Election Dashboard">
+          Back to Homepage
+        </a>
+      </header>
+
+      <section class="population-grid">
+        <div class="map-panel">
+          <div id="pollingUnitsMap" aria-label="Nigeria polling unit accessibility map"></div>
+
+          <button id="mapThemeToggle" type="button" class="map-theme-toggle" title="Switch map theme" aria-label="Toggle map light/dark mode">
+            <svg class="mtt-icon mtt-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4.5"/>
+              <line x1="12" y1="2" x2="12" y2="5"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+              <line x1="4.93" y1="4.93" x2="6.93" y2="6.93"/>
+              <line x1="17.07" y1="17.07" x2="19.07" y2="19.07"/>
+              <line x1="2" y1="12" x2="5" y2="12"/>
+              <line x1="19" y1="12" x2="22" y2="12"/>
+              <line x1="4.93" y1="19.07" x2="6.93" y2="17.07"/>
+              <line x1="17.07" y1="6.93" x2="19.07" y2="4.93"/>
+            </svg>
+            <svg class="mtt-icon mtt-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <span class="mtt-label">Light Map</span>
+          </button>
+
+          <div class="map-legend polling-map-legend">
+            <strong>Accessibility</strong>
+            <span><i class="pu-legend-dot" style="background:#22b573"></i> Broadly Accessible</span>
+            <span><i class="pu-legend-dot" style="background:#f0c95b"></i> Watch Pressure</span>
+            <span><i class="pu-legend-dot" style="background:#f25c54"></i> Needs More Coverage</span>
+            <span><i class="pu-legend-dot" style="background:#63737b"></i> No Data</span>
+          </div>
+
+          <div id="wardStatus" class="ward-status is-hidden">
+            <span id="wardStatusText">Ward boundaries not loaded</span>
+          </div>
+        </div>
+
+        <button
+          id="pollingPanelResizer"
+          class="panel-resizer"
+          type="button"
+          aria-label="Resize details panel"
+          title="Drag to resize details panel"
+        ></button>
+
+        <aside class="insight-panel">
+          <div class="insight-scroll">
+            <section class="stat-card insight-area-card">
+              <span id="pollingAreaLabel">Selected Area</span>
+              <strong id="pollingAreaName">Nigeria</strong>
+            </section>
+            <section class="stat-card">
+              <span>Total Polling Units</span>
+              <strong id="pollingUnitsValue">--</strong>
+            </section>
+            <section class="stat-card">
+              <span>Unique Wards</span>
+              <strong id="pollingWardsValue">--</strong>
+            </section>
+            <section class="stat-card">
+              <span>Population per Polling Unit</span>
+              <strong id="pollingPopulationLoadValue">--</strong>
+            </section>
+            <section class="stat-card">
+              <span>Polling Units per 100k</span>
+              <strong id="pollingUnitsPerPopulationValue">--</strong>
+            </section>
+            <section class="stat-card">
+              <span>Accessibility Band</span>
+              <strong id="pollingBandValue">--</strong>
+            </section>
+            <section class="stat-card">
+              <span>Top Coverage Area</span>
+              <strong id="pollingTopAreaValue">--</strong>
+            </section>
+            <section class="stat-card is-hidden" id="userDistanceCard">
+              <span>Distance to Nearest PU</span>
+              <strong id="userDistanceValue">--</strong>
+            </section>
+
+            <section class="stat-card locate-result-card is-hidden" id="locateResultCard">
+              <h3 class="locate-result-title">Nearest Polling Units</h3>
+              <div id="locateResultContent" class="locate-result-content"></div>
+            </section>
+
+            <section id="pollingReportCard" class="report-card is-hidden">
+              <div class="report-card-head">
+                <div>
+                  <span class="page-kicker">Live report</span>
+                  <h2 id="reportTitle">Area report</h2>
+                </div>
+                <button id="downloadReportButton" class="secondary-button" type="button">Download report</button>
+              </div>
+
+              <div class="report-summary-grid">
+                <div class="report-pill"><span>Area</span><strong id="reportAreaName">--</strong></div>
+                <div class="report-pill"><span>Polling units</span><strong id="reportPuCount">--</strong></div>
+                <div class="report-pill"><span>Closest</span><strong id="reportClosest">--</strong></div>
+                <div class="report-pill"><span>Farthest</span><strong id="reportFarthest">--</strong></div>
+              </div>
+
+              <div class="report-highlight-grid">
+                <div class="report-highlight-card report-highlight-green">
+                  <span>Closest to you</span>
+                  <strong id="reportClosestValue">--</strong>
+                  <small id="reportClosestMeta">--</small>
+                </div>
+                <div class="report-highlight-card report-highlight-amber">
+                  <span>Farthest from you</span>
+                  <strong id="reportFarthestValue">--</strong>
+                  <small id="reportFarthestMeta">--</small>
+                </div>
+              </div>
+
+              <div class="report-section">
+                <h3>Suggested next steps</h3>
+                <ul id="reportSuggestions"></ul>
+              </div>
+
+              <div class="report-section">
+                <h3 id="pollingChartTitle">Coverage pattern</h3>
+                <div class="report-chart-wrap">
+                  <canvas id="pollingChart" aria-label="Polling unit chart"></canvas>
+                </div>
+              </div>
+
+              <div class="report-section">
+                <h3>All polling units in this area</h3>
+                <div id="reportUnitsList" class="report-units-list"></div>
+              </div>
+            </section>
+
+            <section class="chart-card polling-note-card">
+              <h2>Data Source</h2>
+              <p id="pollingMethodology" class="polling-note-text">
+                Accessibility derived from polling unit counts and population coverage.
+              </p>
+              <dl>
+                <div><dt>Source</dt><dd id="pollingSourceName">--</dd></div>
+                <div><dt>Rows Loaded</dt><dd id="pollingRowCount">--</dd></div>
+                <div><dt>Updated</dt><dd id="pollingUpdatedAt">--</dd></div>
+                <div><dt>Ward Analysis</dt><dd id="wardAnalysisStatus">--</dd></div>
+                <div><dt>Matched Wards</dt><dd id="wardAnalysisMatched">--</dd></div>
+                <div><dt>Unmatched PUs</dt><dd id="wardAnalysisUnmatched">--</dd></div>
+              </dl>
+            </section>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/shpjs/shp.min.js"></script>
+    <script src="vendor/chart.js/chart.umd.min.js"></script>
+    <script src="theme.js"></script>
+    <script src="polling-units.js"></script>
+  </body>
+</html>
