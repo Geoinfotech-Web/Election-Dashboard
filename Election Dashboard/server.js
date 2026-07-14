@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
 const Papa = require('papaparse');
+require('dotenv').config();
 
 function disableProxyForGoogleAuth() {
   for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy']) {
@@ -1263,6 +1264,143 @@ app.get('/api/polling-units-data', async (req, res) => {
     console.error('Error handling /api/polling-units-data:', error.message || error);
     return res.status(500).json({ error: 'Failed to load polling unit data.' });
   }
+});
+
+const EKITI_2026_RESULT = {
+  election: 'Ekiti State Governorship Election 2026',
+  state: 'Ekiti',
+  electionDate: '2026-06-20',
+  declaredDate: '2026-06-21',
+  winner: { name: 'Biodun Oyebanji', party: 'APC', votes: 319224 },
+  candidates: [
+    { name: 'Biodun Oyebanji', party: 'APC', votes: 319224 },
+    { name: 'Oluwole Oluyede', party: 'PDP', votes: 40543 },
+    { name: 'Oluwadare Bejide', party: 'ADC', votes: 12872 },
+    { name: 'Ayodeji Ojo', party: 'ADP', votes: 1269 },
+    { name: 'Oyebanji Olajuyin', party: 'LP', votes: 276 },
+    { name: 'Akande Oluwasegun', party: 'AAC', votes: 195 },
+    { name: 'Alade Isaac', party: 'SDP', votes: 179 },
+    { name: 'Opeyemi Falegan', party: 'Accord', votes: 56 },
+    { name: 'Omotosho Mathew', party: 'AA', votes: 126 },
+    { name: 'Anifowoshe Olanrewaju', party: 'APM', votes: 59 },
+    { name: 'Bidemi Awogbemi', party: 'APP', votes: 61 },
+    { name: 'Blessing Abegunde', party: 'NNPP', votes: 35 },
+    { name: 'Osinkolu Olusegun Ayodele', party: 'YPP', votes: 98 },
+    { name: 'Victor Adetunji', party: 'ZLP', votes: 113 },
+  ],
+  totals: { accreditedVoters: 384940, validVotes: 375777, rejectedVotes: 6332, lgAsWon: 16 },
+  sources: [
+    {
+      publisher: 'Channels Television',
+      title: 'INEC Declares APC’s Oyebanji Winner Of Ekiti Gov Election',
+      url: 'https://www.channelstv.com/2026/06/21/inec-declares-apcs-oyebanji-winner-of-ekiti-gov-election/amp/',
+    },
+    {
+      publisher: 'Premium Times',
+      title: 'INEC declares APC’s Oyebanji winner of Ekiti governorship election',
+      url: 'https://www.premiumtimesng.com/regional/ssouth-west/889497-its-official-inec-declares-apcs-oyebanji-winner-of-ekiti-governorship-election.html',
+    },
+    {
+      publisher: 'Peoples Gazette',
+      title: 'How candidates performed in Ekiti governorship election',
+      url: 'https://gazettengr.com/ekitidecides2026-how-candidates-performed-in-ekiti-governorship-election/',
+    },
+  ],
+};
+
+const BBC_AFRICA_RSS_URL = 'https://feeds.bbci.co.uk/news/world/africa/rss.xml';
+const NEWS_API_KEY = process.env.NEWS_API_KEY || '';
+
+function decodeXmlText(value) {
+  return String(value || '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim();
+}
+
+function readRssTag(item, tag) {
+  const match = item.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, 'i'));
+  return decodeXmlText(match?.[1]);
+}
+
+function parseBbcRss(xml) {
+  return [...String(xml || '').matchAll(/<item>([\s\S]*?)<\/item>/gi)]
+    .map((match) => ({
+      title: readRssTag(match[1], 'title'),
+      url: readRssTag(match[1], 'link'),
+      source: 'BBC News Africa',
+      publishedAt: readRssTag(match[1], 'pubDate'),
+    }))
+    .filter((article) => article.title && article.url);
+}
+
+async function fetchBbcAfricaNews() {
+  const response = await fetch(BBC_AFRICA_RSS_URL, {
+    headers: { 'User-Agent': 'Nigeria-Election-GIS-Dashboard/1.0' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) throw new Error(`BBC RSS returned ${response.status}`);
+  return parseBbcRss(await response.text()).slice(0, 4);
+}
+
+async function fetchNewsApiElectionNews() {
+  if (!NEWS_API_KEY) return [];
+  const url = new URL('https://newsapi.org/v2/everything');
+  url.searchParams.set('q', 'Ekiti governorship election');
+  url.searchParams.set('language', 'en');
+  url.searchParams.set('sortBy', 'publishedAt');
+  url.searchParams.set('pageSize', '8');
+  url.searchParams.set('apiKey', NEWS_API_KEY);
+  const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!response.ok) throw new Error(`NewsAPI returned ${response.status}`);
+  const data = await response.json();
+  if (data.status !== 'ok') throw new Error(data.message || 'NewsAPI returned no result.');
+  return (data.articles || []).map((article) => ({
+    title: article.title,
+    url: article.url,
+    source: article.source?.name || 'NewsAPI',
+    publishedAt: article.publishedAt,
+  })).filter((article) => article.title && article.url);
+}
+
+app.get('/api/election-results/ekiti', async (req, res) => {
+  let bbcNews = [];
+  let newsApiNews = [];
+  let gdeltNews = [];
+  const query = encodeURIComponent('Ekiti governorship election 2026 result');
+  const [newsApiResult, bbcResult, gdeltResult] = await Promise.allSettled([
+    fetchNewsApiElectionNews(),
+    fetchBbcAfricaNews(),
+    fetch(`https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=artlist&format=json&maxrecords=6&sort=datedesc`, { signal: AbortSignal.timeout(8000) }),
+  ]);
+
+  if (newsApiResult.status === 'fulfilled') newsApiNews = newsApiResult.value;
+  else console.warn('NewsAPI election refresh unavailable:', newsApiResult.reason?.message || newsApiResult.reason);
+
+  if (bbcResult.status === 'fulfilled') bbcNews = bbcResult.value;
+  else console.warn('BBC Africa news refresh unavailable:', bbcResult.reason?.message || bbcResult.reason);
+
+  if (gdeltResult.status === 'fulfilled' && gdeltResult.value.ok) {
+    const data = await gdeltResult.value.json();
+    gdeltNews = (data.articles || []).map((article) => ({ title: article.title, url: article.url, source: article.domain, publishedAt: article.seendate }));
+  } else if (gdeltResult.status === 'rejected') {
+    console.warn('GDELT election news refresh unavailable:', gdeltResult.reason?.message || gdeltResult.reason);
+  }
+
+  const news = [...newsApiNews, ...bbcNews, ...gdeltNews]
+    .filter((article, index, all) => article.url && all.findIndex((item) => item.url === article.url) === index)
+    .slice(0, 8);
+
+  if (!news.length) {
+    news.push(...EKITI_2026_RESULT.sources.map((source) => ({ title: source.title, url: source.url, source: source.publisher, publishedAt: EKITI_2026_RESULT.declaredDate })));
+  }
+
+  res.setHeader('Cache-Control', 'public, max-age=900');
+  return res.json({ ...EKITI_2026_RESULT, news, newsApi: 'NewsAPI + BBC News Africa RSS + GDELT 2.1 DOC API' });
 });
 
 app.get('/api/polling-unit-points', async (req, res) => {

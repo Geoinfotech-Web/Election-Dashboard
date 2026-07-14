@@ -4,6 +4,7 @@ node_modules/
 # environments
 .venv/
 .env
+.tools
 
 # secrets — DO NOT COMMIT
 credentials.json

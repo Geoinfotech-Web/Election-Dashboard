@@ -11,18 +11,28 @@ const pollingPointsPaneName = 'pollingPointsPane';
 const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
   '&copy; <a href="https://carto.com/attributions">CARTO</a>';
+const GOOGLE_SATELLITE_ATTRIBUTION =
+  'Map data &copy; <a href="https://www.google.com/help/terms_maps/">Google</a>';
 
 const TILE_URLS = {
   dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
   light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  satellite: 'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
 };
 
 let mapTheme = 'dark';
-let currentTileLayer = L.tileLayer(TILE_URLS.dark, {
-  maxZoom: 19,
-  subdomains: 'abcd',
-  attribution: TILE_ATTRIBUTION,
-}).addTo(map);
+const baseMapLayers = {
+  dark: L.tileLayer(TILE_URLS.dark, { maxZoom: 19, subdomains: 'abcd', attribution: TILE_ATTRIBUTION }),
+  light: L.tileLayer(TILE_URLS.light, { maxZoom: 19, subdomains: 'abcd', attribution: TILE_ATTRIBUTION }),
+  satellite: L.tileLayer(TILE_URLS.satellite, { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: GOOGLE_SATELLITE_ATTRIBUTION }),
+};
+let currentTileLayer = baseMapLayers.dark.addTo(map);
+L.control.layers({
+  'Dark Map': baseMapLayers.dark,
+  'Light Map': baseMapLayers.light,
+  'Google Satellite': baseMapLayers.satellite,
+}, null, { position: 'topright' }).addTo(map);
+const initialMapMinZoom = map.getMinZoom();
 
 /* ── DOM refs ───────────────────────────────────────────────────────────── */
 const stateSelect        = document.getElementById('pollingStateSelect');
@@ -36,7 +46,6 @@ const pollingAreaName    = document.getElementById('pollingAreaName');
 const pollingUnitsValue  = document.getElementById('pollingUnitsValue');
 const pollingWardsValue  = document.getElementById('pollingWardsValue');
 const pollingPopulationLoadValue     = document.getElementById('pollingPopulationLoadValue');
-const pollingUnitsPerPopulationValue = document.getElementById('pollingUnitsPerPopulationValue');
 const pollingBandValue   = document.getElementById('pollingBandValue');
 const pollingTopAreaValue= document.getElementById('pollingTopAreaValue');
 const pollingSourceSummary = document.getElementById('pollingSourceSummary');
@@ -54,13 +63,20 @@ const wardStatusEl       = document.getElementById('wardStatus');
 const wardStatusText     = document.getElementById('wardStatusText');
 const userDistanceCard    = document.getElementById('userDistanceCard');
 const userDistanceValue   = document.getElementById('userDistanceValue');
-const locateMeButton      = document.getElementById('locateMeButton');
-const locateMeMessage     = document.getElementById('locateMeMessage');
-const locateResultCard    = document.getElementById('locateResultCard');
-const locateResultContent = document.getElementById('locateResultContent');
+const pollingLegendTitle  = document.getElementById('pollingLegendTitle');
+const pollingLegendItems  = document.getElementById('pollingLegendItems');
+const pollingLegendNote   = document.getElementById('pollingLegendNote');
 const pollingGuideModal   = document.getElementById('pollingGuideModal');
 const pollingGuideClose   = document.getElementById('pollingGuideClose');
 const pollingReportCard   = document.getElementById('pollingReportCard');
+const viewReportButton    = document.getElementById('viewReportButton');
+const reportModal         = document.getElementById('reportModal');
+const reportModalClose    = document.getElementById('reportModalClose');
+const reportModalBackdrop = document.getElementById('reportModalBackdrop');
+
+let lgaData = null;
+let lgaBoundaryLayer = null;
+let pollingViewMode = 'lgaSearch';
 const reportTitle         = document.getElementById('reportTitle');
 const reportAreaName      = document.getElementById('reportAreaName');
 const reportPuCount       = document.getElementById('reportPuCount');
@@ -70,20 +86,29 @@ const reportClosestValue  = document.getElementById('reportClosestValue');
 const reportClosestMeta   = document.getElementById('reportClosestMeta');
 const reportFarthestValue = document.getElementById('reportFarthestValue');
 const reportFarthestMeta  = document.getElementById('reportFarthestMeta');
+const reportSummaryAHeader = document.getElementById('reportSummaryAHeader');
+const reportSummaryBHeader = document.getElementById('reportSummaryBHeader');
+const reportHighlightAHeader = document.getElementById('reportHighlightAHeader');
+const reportHighlightBHeader = document.getElementById('reportHighlightBHeader');
+const reportListTitle      = document.getElementById('reportListTitle');
 const reportSuggestions   = document.getElementById('reportSuggestions');
 const reportUnitsList     = document.getElementById('reportUnitsList');
 const downloadReportButton = document.getElementById('downloadReportButton');
+const downloadPdfReportButton = document.getElementById('downloadPdfReportButton');
+
+const pollingMetricSelect = metricSelect;
 
 /* Layer toggle checkboxes */
 const toggleStates       = document.getElementById('toggleStates');
+const toggleLGAs         = document.getElementById('toggleLGAs');
 const toggleWards        = document.getElementById('toggleWards');
 const togglePollingUnits = document.getElementById('togglePollingUnits');
 const toggleUserLocation = document.getElementById('toggleUserLocation');
-const toggleNearestRoute = document.getElementById('toggleNearestRoute');
 
 /* ── State ──────────────────────────────────────────────────────────────── */
 let adm0Data = null;
 let adm1Data = null;   // state boundaries
+let adm2Data = null;   // LGA boundaries
 let wardData = null;   // ward boundaries (adm3 — optional)
 let pollingData = null;
 let nigeriaBounds = null;
@@ -91,13 +116,11 @@ let pollingChart = null;
 
 /* Map layer handles */
 let stateLayer           = null;
+let lgaAdminLayer        = null;   // LGA administrative layer
 let wardLayer            = null;
 let pollingUnitPointsLayer   = null;
 let userLocationLayer    = null;
-let nearestRouteLayer    = null;
 let highlightLayer       = null;
-let locateMeDotLayer     = null;
-let locateMeRouteLayer   = null;
 
 /* Polling points (loaded once as static GeoJSON, like a shapefile) */
 let allPollingUnitFeatures = [];   // all GeoJSON features from the server
@@ -115,13 +138,6 @@ const METRICS = {
     reverse: false,
     format: (v) => formatNumber(v, 0),
     note: 'Higher values show more polling units in the area.',
-  },
-  pollingUnitsPer100k: {
-    title: 'Polling Units per 100k People',
-    getValue: (row) => row?.pollingUnitsPer100k ?? null,
-    reverse: false,
-    format: (v) => formatNumber(v, 1),
-    note: 'Higher values suggest stronger polling-unit availability per population.',
   },
   populationPerPollingUnit: {
     title: 'Population per Polling Unit',
@@ -252,6 +268,225 @@ function getAccessibilityColor(band) {
   return '#63737b';
 }
 
+const COLOR_PALETTES = {
+  accessibility: {
+    'Broadly Accessible': '#2a9d8f',
+    'Watch Pressure': '#e9c46a',
+    'Needs More Coverage': '#e76f51',
+    'No Data': '#6c757d',
+  },
+  distance: ['#2a9d8f', '#82c0aa', '#f4d35e', '#ee964b', '#d62828'],
+  populationPerPollingUnit: ['#440154', '#414487', '#2a788e', '#22a784', '#7ad151'],
+};
+
+function getDistanceColor(distanceMetres) {
+  if (!Number.isFinite(distanceMetres)) return '#63737b';
+  if (distanceMetres < 1000) return COLOR_PALETTES.distance[0];
+  if (distanceMetres < 3000) return COLOR_PALETTES.distance[1];
+  if (distanceMetres < 5000) return COLOR_PALETTES.distance[2];
+  if (distanceMetres < 10000) return COLOR_PALETTES.distance[3];
+  return COLOR_PALETTES.distance[4];
+}
+
+function getMetricColor(props, distanceMetres) {
+  if (pollingViewMode === 'nearMe' && Number.isFinite(distanceMetres)) {
+    return getDistanceColor(distanceMetres);
+  }
+
+  const metric = pollingMetricSelect?.value || 'accessibilityScore';
+  if (metric === 'accessibilityScore') {
+    return COLOR_PALETTES.accessibility[props.band] || COLOR_PALETTES.accessibility['No Data'];
+  }
+
+  if (metric === 'populationPerPollingUnit') {
+    const value = Number(props.pop_pu);
+    if (!Number.isFinite(value)) return '#63737b';
+    if (value < 1200) return COLOR_PALETTES.populationPerPollingUnit[4];
+    if (value < 1800) return COLOR_PALETTES.populationPerPollingUnit[3];
+    if (value < 2600) return COLOR_PALETTES.populationPerPollingUnit[2];
+    if (value < 3800) return COLOR_PALETTES.populationPerPollingUnit[1];
+    return COLOR_PALETTES.populationPerPollingUnit[0];
+  }
+
+  return COLOR_PALETTES.accessibility[props.band] || COLOR_PALETTES.accessibility['No Data'];
+}
+
+function getLegendEntries() {
+  if (pollingViewMode === 'nearMe') {
+    return [
+      { color: COLOR_PALETTES.distance[0], label: '< 1 km' },
+      { color: COLOR_PALETTES.distance[1], label: '1–3 km' },
+      { color: COLOR_PALETTES.distance[2], label: '3–5 km' },
+      { color: COLOR_PALETTES.distance[3], label: '5–10 km' },
+      { color: COLOR_PALETTES.distance[4], label: '> 10 km' },
+    ];
+  }
+
+  const metric = pollingMetricSelect?.value || 'accessibilityScore';
+  if (metric === 'accessibilityScore') {
+    return [
+      { color: COLOR_PALETTES.accessibility['Broadly Accessible'], label: 'Broadly Accessible' },
+      { color: COLOR_PALETTES.accessibility['Watch Pressure'], label: 'Watch Pressure' },
+      { color: COLOR_PALETTES.accessibility['Needs More Coverage'], label: 'Needs More Coverage' },
+      { color: COLOR_PALETTES.accessibility['No Data'], label: 'No Data' },
+    ];
+  }
+
+  if (metric === 'populationPerPollingUnit') {
+    return [
+      { color: COLOR_PALETTES.populationPerPollingUnit[4], label: '< 1,200' },
+      { color: COLOR_PALETTES.populationPerPollingUnit[3], label: '1,200–1,799' },
+      { color: COLOR_PALETTES.populationPerPollingUnit[2], label: '1,800–2,599' },
+      { color: COLOR_PALETTES.populationPerPollingUnit[1], label: '2,600–3,799' },
+      { color: COLOR_PALETTES.populationPerPollingUnit[0], label: '≥ 3,800' },
+    ];
+  }
+
+  return [
+    { color: COLOR_PALETTES.accessibility['Broadly Accessible'], label: 'Broadly Accessible' },
+    { color: COLOR_PALETTES.accessibility['Watch Pressure'], label: 'Watch Pressure' },
+    { color: COLOR_PALETTES.accessibility['Needs More Coverage'], label: 'Needs More Coverage' },
+    { color: COLOR_PALETTES.accessibility['No Data'], label: 'No Data' },
+  ];
+}
+
+function updateLegendMode() {
+  if (!pollingLegendTitle || !pollingLegendItems || !pollingLegendNote) return;
+
+  const metric = pollingViewMode === 'nearMe' ? 'nearMe' : pollingMetricSelect?.value || 'accessibilityScore';
+  const entries = getLegendEntries();
+
+  pollingLegendTitle.textContent = metric === 'nearMe'
+    ? 'Distance from you'
+    : metric === 'populationPerPollingUnit'
+      ? 'Population per polling unit'
+      : 'Accessibility band';
+
+  pollingLegendItems.innerHTML = entries
+    .map((item) => `<span><i class="pu-legend-dot" style="background:${item.color}"></i> ${item.label}</span>`)
+    .join('');
+
+  pollingLegendNote.textContent = metric === 'nearMe'
+    ? 'Polling units are colored by distance from your location.'
+    : metric === 'populationPerPollingUnit'
+      ? 'Lower population per polling unit indicates better coverage.'
+      : 'Polling units are colored by accessibility band.';
+}
+
+function clearLgaBoundary() {
+  if (lgaBoundaryLayer) {
+    map.removeLayer(lgaBoundaryLayer);
+    lgaBoundaryLayer = null;
+  }
+}
+
+function getLgaFeature() {
+  if (!lgaData || !stateSelect.value || !lgaSelect.value) return null;
+  const stateKey = normalizeLookupKey(stateSelect.value);
+  const lgaKey = normalizeLookupKey(lgaSelect.value);
+  return (lgaData.features || []).find((feature) => {
+    const featureState = normalizeLookupKey(feature.properties.NAME_1 || feature.properties.NAME_0 || '');
+    const featureLga = normalizeLookupKey(feature.properties.NAME_2 || feature.properties.VARNAME_2 || feature.properties.NL_NAME_2 || '');
+    return featureState === stateKey && featureLga === lgaKey;
+  }) || null;
+}
+
+function renderLgaBoundary() {
+  clearLgaBoundary();
+  if (!lgaData || !stateSelect.value || !lgaSelect.value || pollingViewMode !== 'lgaSearch') return;
+  const feature = getLgaFeature();
+  if (!feature) return;
+
+  lgaBoundaryLayer = L.geoJSON(feature, {
+    interactive: false,
+    style: {
+      color: '#d96b6b',
+      weight: 3,
+      fillColor: '#f7b6b2',
+      fillOpacity: 0.32,
+      opacity: 0.9,
+      dashArray: '4,4',
+    },
+  }).addTo(map);
+
+  const bounds = L.geoJSON(feature).getBounds();
+  if (bounds.isValid()) {
+    map.fitBounds(bounds.pad(0.08), { padding: [14, 14] });
+  }
+}
+
+function pointInPolygon(point, polygon) {
+  const [x, y] = point;
+  let inside = false;
+
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0];
+    const yi = polygon[i][1];
+    const xj = polygon[j][0];
+    const yj = polygon[j][1];
+
+    const intersect = ((yi > y) !== (yj > y)) &&
+      (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+
+  return inside;
+}
+
+function isPointInGeoFeature(coordinates, feature) {
+  if (!feature || !feature.geometry) return false;
+  try {
+    return turf.booleanPointInPolygon(turf.point(coordinates), feature);
+  } catch (error) {
+    console.warn('Turf point-in-polygon failed, falling back to manual test:', error);
+    const geom = feature.geometry;
+    if (geom.type === 'Polygon') {
+      return feature.geometry.coordinates.some((ring) => pointInPolygon(coordinates, ring));
+    }
+    if (geom.type === 'MultiPolygon') {
+      return geom.coordinates.some((polygon) => polygon.some((ring) => pointInPolygon(coordinates, ring)));
+    }
+    return false;
+  }
+}
+
+function getSelectedBoundaryFeature() {
+  if (lgaSelect.value) {
+    return getLgaFeature();
+  }
+
+  if (!stateSelect.value) return null;
+  return getStateFeatures().find(
+    (feature) => normalizeLookupKey(getFeatureStateName(feature)) === normalizeLookupKey(stateSelect.value)
+  ) || null;
+}
+
+function resetMapBounds() {
+  if (nigeriaBounds && nigeriaBounds.isValid()) {
+    map.setMaxBounds(nigeriaBounds.pad(0.04));
+  } else {
+    map.setMaxBounds(null);
+  }
+  map.setMinZoom(initialMapMinZoom);
+}
+
+function constrainMapToFeature(feature) {
+  if (!feature) {
+    resetMapBounds();
+    return;
+  }
+
+  const bounds = L.geoJSON(feature).getBounds();
+  if (!bounds.isValid()) {
+    resetMapBounds();
+    return;
+  }
+
+  map.fitBounds(bounds.pad(0.08), { padding: [18, 18], maxZoom: 12 });
+  map.setMaxBounds(bounds.pad(0.08));
+  map.setMinZoom(Math.max(initialMapMinZoom, map.getBoundsZoom(bounds.pad(0.08), false)));
+}
+
 function ensurePollingPointsPane() {
   if (map.getPane(pollingPointsPaneName)) {
     return map.getPane(pollingPointsPaneName);
@@ -283,11 +518,49 @@ function renderStateBoundaries() {
           stateSelect.value = stateName;
           updateLgaOptions();
           lgaSelect.value = '';
+          clearPollingUnitPointsLayer();
+          loadedPoints = [];
           updateDetailsPanel();
+          togglePollingUnits.checked = true;
+          renderAllBoundaries();
           renderPollingUnitPointsLayer();
+          renderAreaReport();
           zoomToFeature(feature);
         });
         layer.bindTooltip(stateName, { permanent: false, direction: 'center', className: 'pu-state-tooltip' });
+      },
+    }
+  ).addTo(map);
+}
+
+/* ── LGA administrative boundary layer ──────────────────────────────────── */
+function getLgaAdminFeatures() {
+  if (!adm2Data) return [];
+  return adm2Data.features || [];
+}
+
+function clearLgaAdminLayer() {
+  if (lgaAdminLayer) { map.removeLayer(lgaAdminLayer); lgaAdminLayer = null; }
+}
+
+function renderLgaAdminBoundaries() {
+  clearLgaAdminLayer();
+  if (!adm2Data || !toggleLGAs.checked) return;
+
+  lgaAdminLayer = L.geoJSON(
+    { type: 'FeatureCollection', features: getLgaAdminFeatures() },
+    {
+      style: {
+        color: '#d96b6b',
+        weight: 1,
+        fillColor: '#f7b6b2',
+        fillOpacity: 0.22,
+        opacity: 0.8,
+      },
+      onEachFeature(feature, layer) {
+        const lgaName = feature.properties.NAME_2 || feature.properties.VARNAME_2 || feature.properties.NL_NAME_2 || 'LGA';
+        const stateName = feature.properties.NAME_1 || feature.properties.NAME_0 || '';
+        layer.bindTooltip(`${lgaName}, ${stateName}`, { permanent: false, direction: 'center', className: 'pu-lga-tooltip' });
       },
     }
   ).addTo(map);
@@ -330,87 +603,179 @@ function clearPollingUnitPointsLayer() {
   if (pollingUnitPointsLayer) { map.removeLayer(pollingUnitPointsLayer); pollingUnitPointsLayer = null; }
 }
 
-function getPollingUnitPopupContent(props) {
+function getPollingUnitPopupContent(props, distanceMetres, travelTimes) {
   const loc = [props.ward, props.lga, props.state].filter(Boolean).join(', ');
-  const placement =
-    props.geometrySource === 'source'
-      ? 'Exact source coordinate'
-      : props.geometrySource === 'csv-latlong'
-        ? 'CSV geocoded coordinate'
-      : props.geometrySource === 'google-geocode'
-        ? 'Google geocoded address'
-        : 'Estimated from local area';
+
+  let travelSection = '<span class="popup-note">Enable location to see distance & travel time.</span>';
+  if (Number.isFinite(distanceMetres)) {
+    const walkingText = formatDuration(estimateWalkingDuration(distanceMetres));
+    const drivingText = travelTimes?.driving != null ? formatDuration(travelTimes.driving) : 'Loading driving…';
+    travelSection = `
+      <div class="popup-stats-row">
+        <span>Distance</span>
+        <strong>${formatDistance(distanceMetres)}</strong>
+      </div>
+      <div class="popup-stats-row">
+        <span>Walking</span>
+        <strong>${walkingText}</strong>
+      </div>
+      <div class="popup-stats-row">
+        <span>Driving</span>
+        <strong>${drivingText}</strong>
+      </div>
+    `;
+  }
+
   return `
-    <strong>${props.name || 'Polling Unit'}</strong>
-    <span>${loc || 'Nigeria'}</span>
-    <span>Accessibility: ${props.band || '--'}</span>
-    <span>Pop. per PU: ${formatNumber(props.pop_pu, 0)}</span>
-    <span>PUs per 100k: ${formatNumber(props.pu_100k, 1)}</span>
-    <span>Placement: ${placement}</span>
+    <div class="polling-popup-card">
+      <div class="popup-header">
+        <div>
+          <strong>${props.name || 'Polling Unit'}</strong>
+          <span>${loc || 'Nigeria'}</span>
+        </div>
+        <span class="popup-badge">${props.band || 'No data'}</span>
+      </div>
+
+      ${travelSection}
+    </div>
   `;
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(seconds)) return '--';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder === 0
+    ? `${hours} hr${hours === 1 ? '' : 's'}`
+    : `${hours} hr ${remainder} min`;
+}
+
+function estimateWalkingDuration(distanceMetres) {
+  // Walking follows the direct path with a modest detour allowance at 4.8 km/h.
+  const walkingSpeedMetresPerSecond = 4.8 * 1000 / 3600;
+  return (distanceMetres * 1.25) / walkingSpeedMetresPerSecond;
+}
+
+async function fetchOsrmDuration(origin, destination, profile) {
+  const url = `https://router.project-osrm.org/route/v1/${profile}/${origin[0]},${origin[1]};${destination[0]},${destination[1]}?overview=false&alternatives=false&annotations=duration`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data?.routes?.[0]?.duration ?? null;
+  } catch (error) {
+    console.warn('OSRM fetch failed:', error);
+    return null;
+  }
+}
+
+async function fetchOsrmRouteMetrics(origin, destination) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${origin[0]},${origin[1]};${destination[0]},${destination[1]}?overview=false&alternatives=false`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const route = (await response.json())?.routes?.[0];
+    return route ? { duration: route.duration, distance: route.distance } : null;
+  } catch (error) {
+    console.warn('OSRM route metrics fetch failed:', error);
+    return null;
+  }
+}
+
+async function fetchTravelTimes(origin, destination) {
+  // The public OSRM endpoint uses a driving profile; walking is estimated separately.
+  const driving = await fetchOsrmDuration(origin, destination, 'driving');
+  return { driving };
 }
 
 function renderPollingUnitPointsLayer() {
   clearPollingUnitPointsLayer();
   loadedPoints = [];
-  if (!togglePollingUnits.checked || !allPollingUnitFeatures.length) return;
+  if (!togglePollingUnits.checked || !allPollingUnitFeatures.length || !stateSelect.value) return;
 
   const state = stateSelect.value;
   const lga   = lgaSelect.value;
+  const boundaryFeature = getSelectedBoundaryFeature();
+  if (!boundaryFeature) return;
 
-  if (!state || !lga) return;
-
-  const features = allPollingUnitFeatures.filter((f) => {
-    if (normalizeLookupKey(f.properties.state) !== normalizeLookupKey(state)) return false;
-    if (normalizeLookupKey(f.properties.lga) !== normalizeLookupKey(lga)) return false;
-    return true;
-  });
+  let features = allPollingUnitFeatures
+    .filter((f) => normalizeLookupKey(f.properties.state) === normalizeLookupKey(state))
+    .filter((f) => !lga || normalizeLookupKey(f.properties.lga) === normalizeLookupKey(lga))
+    .filter((f) => isPointInGeoFeature(f.geometry.coordinates, boundaryFeature));
 
   if (!features.length) return;
 
   /* build flat point list for nearest-route calculations */
-  loadedPoints = features.map((f) => ({
-    latitude:  f.geometry.coordinates[1],
-    longitude: f.geometry.coordinates[0],
-    ...f.properties,
-  }));
+  loadedPoints = features.map((f) => {
+    const latitude = f.geometry.coordinates[1];
+    const longitude = f.geometry.coordinates[0];
+    const point = {
+      latitude,
+      longitude,
+      ...f.properties,
+    };
 
-  pollingUnitPointsLayer = L.geoJSON(
+    if (userLatLng && pollingViewMode === 'nearMe') {
+      point._distance = userLatLng.distanceTo(L.latLng(latitude, longitude));
+    }
+    return point;
+  });
+
+  const markers = L.geoJSON(
     { type: 'FeatureCollection', features },
     {
       pane: pollingPointsPaneName,
-      pointToLayer: (feature, latlng) =>
-        L.circleMarker(latlng, {
-          radius: feature.properties.geometrySource === 'source' ? 4.8 : 4,
-          color:
-            feature.properties.geometrySource === 'source'
-              ? '#ffffff'
-              : feature.properties.geometrySource === 'csv-latlong'
-                ? '#244d38'
-              : feature.properties.geometrySource === 'google-geocode'
-                ? '#3d2f00'
-                : '#1f2c3a',
-          weight: feature.properties.geometrySource === 'source' ? 1.1 : 0.8,
-          opacity: feature.properties.geometrySource === 'source' ? 1 : 0.9,
-          fillColor:
-            feature.properties.geometrySource === 'source'
-              ? getAccessibilityColor(feature.properties.band)
-              : feature.properties.geometrySource === 'csv-latlong'
-                ? '#42d392'
-              : feature.properties.geometrySource === 'google-geocode'
-                ? '#ffbf47'
-                : '#8aa0b7',
-          fillOpacity: feature.properties.geometrySource === 'source' ? 0.95 : 0.75,
-        }),
+      pointToLayer: (feature, latlng) => {
+        const props = feature.properties;
+        const latitude = latlng.lat;
+        const longitude = latlng.lng;
+        const distance = userLatLng && pollingViewMode === 'nearMe'
+          ? userLatLng.distanceTo(L.latLng(latitude, longitude))
+          : null;
+        const fillColor = getMetricColor(props, distance);
+
+        return L.circleMarker(latlng, {
+          radius: 2.5,
+          color: '#ffffff',
+          weight: 0.9,
+          opacity: 1,
+          fillColor: '#e53935',
+          fillOpacity: 0.92,
+        });
+      },
       onEachFeature: (feature, layer) => {
-        layer.bindPopup(getPollingUnitPopupContent(feature.properties));
+        const props = feature.properties;
+        const coordinates = feature.geometry.coordinates;
+        const distance = userLatLng
+          ? userLatLng.distanceTo(L.latLng(coordinates[1], coordinates[0]))
+          : null;
+
+        layer.bindPopup(getPollingUnitPopupContent(props, distance, distance ? { walking: null, driving: null } : null), {
+          maxWidth: 360,
+          minWidth: 280,
+          className: 'polling-popup',
+        });
+
+        layer.on('popupopen', async () => {
+          if (!userLatLng || !distance) return;
+          if (layer._travelTimesLoaded) return;
+
+          const origin = [userLatLng.lng, userLatLng.lat];
+          const destination = [coordinates[0], coordinates[1]];
+          const travelTimes = await fetchTravelTimes(origin, destination);
+
+          layer._travelTimesLoaded = true;
+          layer.setPopupContent(getPollingUnitPopupContent(props, distance, travelTimes));
+        });
       },
     }
-  ).addTo(map);
+  );
 
-  pollingUnitPointsLayer.bringToFront();
+  pollingUnitPointsLayer = markers.addTo(map);
+  markers.bringToFront();
 
-  if (toggleNearestRoute.checked && userLatLng) renderNearestRoute();
   renderAreaReport();
 }
 
@@ -439,7 +804,6 @@ async function loadPollingUnitPointsGeoJSON() {
     if (!response.ok) throw new Error('Unable to load polling unit GeoJSON.');
     const geojson = await response.json();
     allPollingUnitFeatures = geojson.features || [];
-    renderPollingUnitPointsLayer();
     const counts = geojson?.source?.counts || {};
     const estimatedCount = Number(counts.estimated || 0);
     const geocodedCount = Number(counts.geocoded || 0);
@@ -494,7 +858,6 @@ function applyUserLocation(position) {
   userLocationLayer.addTo(map);
   map.panTo(userLatLng);
 
-  if (toggleNearestRoute.checked) renderNearestRoute();
   renderAreaReport();
 }
 
@@ -512,251 +875,48 @@ function activateUserLocation() {
       setSearchMessage('Unable to get your location. Check browser permissions.');
       toggleUserLocation.checked = false;
       clearUserLocation();
-      if (toggleNearestRoute.checked) { toggleNearestRoute.checked = false; clearNearestRoute(); }
     },
     { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
   );
 }
 
-/* ── Nearest route ──────────────────────────────────────────────────────── */
-function clearNearestRoute() {
-  if (nearestRouteLayer) { map.removeLayer(nearestRouteLayer); nearestRouteLayer = null; }
-  userDistanceCard.classList.add('is-hidden');
-}
-
-function renderNearestRoute() {
-  clearNearestRoute();
-
-  if (!userLatLng || !loadedPoints.length) return;
-
-  let nearest = null;
-  let minDist  = Infinity;
-
-  for (const pt of loadedPoints) {
-    const dist = userLatLng.distanceTo(L.latLng(pt.latitude, pt.longitude));
-    if (dist < minDist) { minDist = dist; nearest = pt; }
-  }
-
-  if (!nearest) return;
-
-  const nearestLatLng = L.latLng(nearest.latitude, nearest.longitude);
-
-  nearestRouteLayer = L.layerGroup();
-
-  L.polyline([userLatLng, nearestLatLng], {
-    color: '#f0c95b',
-    weight: 2.5,
-    dashArray: '6,5',
-    opacity: 0.9,
-    interactive: false,
-  }).addTo(nearestRouteLayer);
-
-  L.circleMarker(nearestLatLng, {
-    radius: 6,
-    color: '#f0c95b',
-    weight: 2,
-    fillColor: '#f0c95b',
-    fillOpacity: 0.9,
-  }).bindPopup(
-    `<strong>${nearest.pollingUnit || 'Nearest Polling Unit'}</strong>` +
-    `<span>${[nearest.ward, nearest.lga, nearest.state].filter(Boolean).join(', ')}</span>` +
-    `<span>Distance: ${formatDistance(minDist)}</span>`
-  ).addTo(nearestRouteLayer);
-
-  nearestRouteLayer.addTo(map);
-
-  userDistanceCard.classList.remove('is-hidden');
-  userDistanceValue.textContent = formatDistance(minDist);
-}
-
 /* ── Map theme toggle ───────────────────────────────────────────────────── */
-function toggleMapTheme() {
-  mapTheme = mapTheme === 'dark' ? 'light' : 'dark';
+function applyBaseMap(key) {
+  if (!baseMapLayers[key]) return;
 
-  map.removeLayer(currentTileLayer);
-  currentTileLayer = L.tileLayer(TILE_URLS[mapTheme], {
-    maxZoom: 19,
-    subdomains: 'abcd',
-    attribution: TILE_ATTRIBUTION,
-  }).addTo(map);
+  if (currentTileLayer !== baseMapLayers[key]) {
+    map.removeLayer(currentTileLayer);
+    currentTileLayer = baseMapLayers[key].addTo(map);
+  }
   currentTileLayer.bringToBack();
 
+  mapTheme = key;
+
   const mapPanel = document.querySelector('.map-panel');
-  mapPanel.classList.toggle('map-light', mapTheme === 'light');
+  mapPanel.classList.toggle('map-light', key === 'light');
 
   const lbl = document.querySelector('.mtt-label');
-  if (lbl) lbl.textContent = mapTheme === 'light' ? 'Dark Map' : 'Light Map';
+  if (lbl) lbl.textContent = key === 'light' ? 'Dark Map' : 'Light Map';
 
-  /* Re-render boundaries so line colours match the new basemap */
-  renderStateBoundaries();
-  renderWardBoundaries();
+  // Re-render boundaries so their contrast remains clear on the selected basemap.
+  renderAllBoundaries();
+}
+
+function toggleMapTheme() {
+  applyBaseMap(mapTheme === 'dark' ? 'light' : 'dark');
 }
 
 document.getElementById('mapThemeToggle').addEventListener('click', toggleMapTheme);
 
-/* ── Locate Me ──────────────────────────────────────────────────────────── */
-function haversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat  = toRad(lat2 - lat1);
-  const dLon  = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function formatDistancePrecise(metres) {
-  if (!Number.isFinite(metres)) return '--';
-  return metres < 1000
-    ? `${metres.toFixed(2)} m`
-    : `${(metres / 1000).toFixed(2)} km`;
-}
-
-function clearLocateMe() {
-  if (locateMeDotLayer)   { map.removeLayer(locateMeDotLayer);   locateMeDotLayer   = null; }
-  if (locateMeRouteLayer) { map.removeLayer(locateMeRouteLayer); locateMeRouteLayer = null; }
-  locateResultCard.classList.add('is-hidden');
-  locateResultContent.innerHTML = '';
-}
-
-function getStateRegisteredVoters(stateName) {
-  const row = (pollingData?.states || []).find(
-    (r) => normalizeLookupKey(r.state) === normalizeLookupKey(stateName)
-  );
-  return row?.registeredVoters ?? null;
-}
-
-function renderLocateResultCard(nearest3) {
-  locateResultContent.innerHTML = '';
-  nearest3.forEach((pt, i) => {
-    const voters  = getStateRegisteredVoters(pt.state);
-    const isFirst = i === 0;
-    const item = document.createElement('div');
-    item.className = `locate-pu-item${isFirst ? ' is-nearest' : ''}`;
-    item.innerHTML =
-      `<p class="locate-pu-item-name"><span class="locate-pu-rank">#${i + 1}</span>${pt.name || 'Polling Unit'}</p>` +
-      `<p class="locate-pu-item-loc">${[pt.ward, pt.lga, pt.state].filter(Boolean).join(', ')}</p>` +
-      `<div class="locate-pu-item-meta">` +
-        `<span class="locate-pu-item-dist">${formatDistancePrecise(pt._distance)}</span>` +
-        `<span class="locate-pu-item-voters">${voters !== null ? formatNumber(voters) + ' reg. voters (state)' : '--'}</span>` +
-      `</div>`;
-    locateResultContent.appendChild(item);
-  });
-  locateResultCard.classList.remove('is-hidden');
-}
-
-function locateMe() {
-  if (!('geolocation' in navigator)) {
-    locateMeMessage.textContent = 'Geolocation is not supported by your browser.';
-    return;
-  }
-
-  locateMeButton.disabled = true;
-  locateMeButton.classList.add('is-locating');
-  locateMeMessage.textContent = 'Locating…';
-  clearLocateMe();
-
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      try {
-        const { latitude: lat, longitude: lon } = position.coords;
-        const userPos = L.latLng(lat, lon);
-
-        /* Reverse geocode with Nominatim */
-        let address = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-        try {
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
-            { headers: { 'User-Agent': 'Nigeria Election GIS Dashboard' } }
-          );
-          if (geoRes.ok) {
-            const geoData = await geoRes.json();
-            address = geoData.display_name || address;
-          }
-        } catch { /* fall back to coordinates */ }
-
-        /* Pulsing blue dot marker */
-        const pulsingIcon = L.divIcon({
-          className: '',
-          html: '<div class="locate-me-dot"><div class="locate-me-ring"></div></div>',
-          iconSize: [24, 24],
-          iconAnchor: [12, 12],
-          popupAnchor: [0, -16],
-        });
-
-        locateMeDotLayer = L.marker(userPos, { icon: pulsingIcon })
-          .bindPopup(`<strong>Your Location</strong><span>${address}</span>`)
-          .addTo(map);
-        map.panTo(userPos);
-
-        if (!loadedPoints.length) {
-          locateMeMessage.textContent = 'Polling unit data not yet loaded — try again shortly.';
-          return;
-        }
-
-        /* Haversine distances to every loaded point, find 3 nearest */
-        const nearest3 = loadedPoints
-          .map((pt) => ({ ...pt, _distance: haversineDistance(lat, lon, pt.latitude, pt.longitude) }))
-          .sort((a, b) => a._distance - b._distance)
-          .slice(0, 3);
-
-        const nearest       = nearest3[0];
-        const nearestLatLng = L.latLng(nearest.latitude, nearest.longitude);
-
-        locateMeRouteLayer = L.layerGroup();
-
-        /* Dashed red line user → nearest PU */
-        L.polyline([userPos, nearestLatLng], {
-          color: '#ff3d3d',
-          dashArray: '6,6',
-          weight: 2,
-          opacity: 0.9,
-          interactive: false,
-        }).addTo(locateMeRouteLayer);
-
-        /* Nearest PU highlighted with large red circle */
-        L.circleMarker(nearestLatLng, {
-          radius: 10,
-          color: '#ffffff',
-          weight: 2,
-          fillColor: '#ff3d3d',
-          fillOpacity: 1,
-        }).bindPopup(
-          `<strong>${nearest.name || 'Nearest Polling Unit'}</strong>` +
-          `<span>${[nearest.ward, nearest.lga, nearest.state].filter(Boolean).join(', ')}</span>` +
-          `<span>Distance: ${formatDistancePrecise(nearest._distance)}</span>`
-        ).addTo(locateMeRouteLayer);
-
-        locateMeRouteLayer.addTo(map);
-
-        /* Result card */
-        renderLocateResultCard(nearest3);
-        renderAreaReport();
-        locateMeMessage.textContent =
-          `Nearest: ${nearest.name || 'polling unit'} — ${formatDistancePrecise(nearest._distance)}`;
-      } catch (err) {
-        console.error('Locate Me error:', err);
-        locateMeMessage.textContent = 'Something went wrong while locating. Please try again.';
-      } finally {
-        locateMeButton.disabled = false;
-        locateMeButton.classList.remove('is-locating');
-      }
-    },
-    (err) => {
-      locateMeButton.disabled = false;
-      locateMeButton.classList.remove('is-locating');
-      locateMeMessage.textContent = err.code === 1
-        ? 'Location access denied. Please enable location in your browser settings.'
-        : 'Unable to determine your location. Please try again.';
-    },
-    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-  );
-}
-
-locateMeButton.addEventListener('click', locateMe);
+map.on('baselayerchange', (event) => {
+  const key = Object.entries(baseMapLayers).find(([, layer]) => layer === event.layer)?.[0];
+  if (key) applyBaseMap(key);
+});
 
 /* ── Layer toggle handlers ──────────────────────────────────────────────── */
 toggleStates.addEventListener('change', renderStateBoundaries);
+
+toggleLGAs.addEventListener('change', renderLgaAdminBoundaries);
 
 toggleWards.addEventListener('change', () => {
   if (wardData) {
@@ -771,25 +931,19 @@ togglePollingUnits.addEventListener('change', () => {
   renderPollingUnitPointsLayer();
 });
 
+if (pollingMetricSelect) {
+  pollingMetricSelect.addEventListener('change', () => {
+    updateLegendMode();
+    renderPollingUnitPointsLayer();
+  });
+}
+
 toggleUserLocation.addEventListener('change', () => {
   if (toggleUserLocation.checked) {
     activateUserLocation();
   } else {
     clearUserLocation();
-    if (toggleNearestRoute.checked) { toggleNearestRoute.checked = false; clearNearestRoute(); }
   }
-});
-
-toggleNearestRoute.addEventListener('change', () => {
-  if (!toggleNearestRoute.checked) {
-    clearNearestRoute();
-    return;
-  }
-  if (!toggleUserLocation.checked) {
-    toggleUserLocation.checked = true;
-    activateUserLocation();
-  }
-  if (userLatLng) renderNearestRoute();
 });
 
 /* ── Zoom / move ────────────────────────────────────────────────────────── */
@@ -923,115 +1077,161 @@ function renderAreaReport() {
   const state = stateSelect.value;
   const lga = lgaSelect.value;
 
-  if (!pollingData || !pollingReportCard) {
+  if (!pollingData || !reportTitle) {
     return;
   }
 
-  const features = getFilteredPollingUnitFeatures();
-  if (!state || !lga || !features.length) {
-    pollingReportCard.classList.add('is-hidden');
+  if (!state) {
+    viewReportButton?.setAttribute('disabled', '');
+    downloadPdfReportButton?.setAttribute('disabled', '');
+    if (downloadPdfReportButton) downloadPdfReportButton.querySelector('small').textContent = 'Select a state or LGA';
     return;
   }
 
-  pollingReportCard.classList.remove('is-hidden');
-  reportTitle.textContent = lga ? `${lga} report` : 'Area report';
+  viewReportButton?.removeAttribute('disabled');
+  downloadPdfReportButton?.removeAttribute('disabled');
+  if (downloadPdfReportButton) downloadPdfReportButton.querySelector('small').textContent = lga ? `${lga}, ${state}` : `${state} state`;
+  const stateRow = (pollingData.states || []).find(
+    (row) => normalizeLookupKey(row.state) === normalizeLookupKey(state)
+  );
+  const stateLgas = (pollingData.lgas || []).filter(
+    (row) => normalizeLookupKey(row.state) === normalizeLookupKey(state)
+  );
 
-  const areaLabel = lga && state ? `${lga}, ${state}` : state || 'Selected area';
-  reportAreaName.textContent = areaLabel;
-  reportPuCount.textContent = formatNumber(features.length);
+  if (lga) {
+    const features = getFilteredPollingUnitFeatures();
+    reportTitle.textContent = `${lga} report`;
+    reportAreaName.textContent = `${lga}, ${state}`;
+    reportPuCount.textContent = formatNumber(features.length);
+    if (reportSummaryAHeader) reportSummaryAHeader.textContent = 'Closest';
+    if (reportSummaryBHeader) reportSummaryBHeader.textContent = 'Farthest';
+    if (reportHighlightAHeader) reportHighlightAHeader.textContent = 'Closest to you';
+    if (reportHighlightBHeader) reportHighlightBHeader.textContent = 'Farthest from you';
 
-  const points = features
-    .map((feature) => {
-      const [lng, lat] = feature.geometry.coordinates;
-      return {
-        ...feature.properties,
-        latitude: lat,
-        longitude: lng,
-      };
-    })
-    .filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
+    const points = features
+      .map((feature) => {
+        const [lng, lat] = feature.geometry.coordinates;
+        return {
+          ...feature.properties,
+          latitude: lat,
+          longitude: lng,
+        };
+      })
+      .filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
 
-  if (userLatLng) {
-    points.forEach((point) => {
-      point._distance = userLatLng.distanceTo(L.latLng(point.latitude, point.longitude)) / 1000;
-    });
-  }
+    if (userLatLng) {
+      points.forEach((point) => {
+        point._distance = userLatLng.distanceTo(L.latLng(point.latitude, point.longitude)) / 1000;
+      });
+    }
 
-  let closest = null;
-  let farthest = null;
-  let closestDistance = null;
-  let farthestDistance = null;
+    let closest = null;
+    let farthest = null;
+    let closestDistance = null;
+    let farthestDistance = null;
 
-  if (userLatLng && points.length) {
-    points.forEach((point) => {
-      const distanceKm = point._distance;
-      if (closestDistance === null || distanceKm < closestDistance) {
-        closestDistance = distanceKm;
-        closest = point;
-      }
-      if (farthestDistance === null || distanceKm > farthestDistance) {
-        farthestDistance = distanceKm;
-        farthest = point;
-      }
-    });
-  }
+    if (userLatLng && points.length) {
+      points.forEach((point) => {
+        const distanceKm = point._distance;
+        if (closestDistance === null || distanceKm < closestDistance) {
+          closestDistance = distanceKm;
+          closest = point;
+        }
+        if (farthestDistance === null || distanceKm > farthestDistance) {
+          farthestDistance = distanceKm;
+          farthest = point;
+        }
+      });
+    }
 
-  reportClosest.textContent = closest ? closest.name || 'Polling Unit' : '--';
-  reportFarthest.textContent = farthest ? farthest.name || 'Polling Unit' : '--';
+    reportClosest.textContent = closest ? closest.name || 'Polling Unit' : '--';
+    reportFarthest.textContent = farthest ? farthest.name || 'Polling Unit' : '--';
 
-  if (closest) {
-    reportClosestValue.textContent = `${closest.name || 'Polling Unit'}`;
-    reportClosestMeta.textContent = userLatLng
+    reportClosestValue.textContent = closest ? `${closest.name || 'Polling Unit'}` : '--';
+    reportClosestMeta.textContent = closest
       ? `${formatNumber(closestDistance, 1)} km • ${formatTravelTime(closestDistance)}`
-      : 'Tap Locate Me for travel distance';
-  } else {
-    reportClosestValue.textContent = '--';
-    reportClosestMeta.textContent = 'Tap Locate Me for travel distance';
+      : 'Enable User Location to calculate distance';
+
+    reportFarthestValue.textContent = farthest ? `${farthest.name || 'Polling Unit'}` : '--';
+    reportFarthestMeta.textContent = farthest
+      ? `${formatNumber(farthestDistance, 1)} km • ${formatTravelTime(farthestDistance)}`
+      : 'Enable User Location to calculate distance';
+
+    const suggestions = [];
+    if (!userLatLng) {
+      suggestions.push('Enable User Location so the report can show closest and farthest polling units from your position.');
+    }
+    if (closestDistance !== null && closestDistance > 3) {
+      suggestions.push('The nearest polling unit is farther than expected, so transport support or a new access point may help.');
+    }
+    if (farthestDistance !== null && farthestDistance > 8) {
+      suggestions.push('Some polling units are quite far away, so consider additional outreach or better route planning.');
+    }
+    const row = stateLgas.find((r) => normalizeLookupKey(r.lga) === normalizeLookupKey(lga));
+    if (row?.accessibilityBand === 'Needs More Coverage') {
+      suggestions.push('This LGA needs more coverage, so adding or redistributing polling units would improve access.');
+    } else if (row?.accessibilityBand === 'Watch Pressure') {
+      suggestions.push('This area is under watch pressure, so more support during peak periods would help.');
+    } else {
+      suggestions.push('Coverage looks generally healthy, so keep monitoring and supporting the busiest wards.');
+    }
+
+    reportSuggestions.innerHTML = suggestions.map((item) => `<li>${item}</li>`).join('');
+    reportListTitle.textContent = `Polling units in ${lga}`;
+
+    reportUnitsList.innerHTML = points
+      .map((point) => {
+        const unitName = point.name || 'Polling Unit';
+        const locationText = [point.ward, point.lga, point.state].filter(Boolean).join(', ');
+        const distanceText = userLatLng && Number.isFinite(point._distance)
+          ? `${formatNumber(point._distance, 1)} km`
+          : 'Distance pending';
+        return `<div class="report-unit-item"><strong>${unitName}</strong><span>${locationText}</span><span>${distanceText}</span></div>`;
+      })
+      .join('');
+
+    updateChart({ state, lga });
+    return;
   }
 
-  if (farthest) {
-    reportFarthestValue.textContent = `${farthest.name || 'Polling Unit'}`;
-    reportFarthestMeta.textContent = userLatLng
-      ? `${formatNumber(farthestDistance, 1)} km • ${formatTravelTime(farthestDistance)}`
-      : 'Tap Locate Me for travel distance';
-  } else {
-    reportFarthestValue.textContent = '--';
-    reportFarthestMeta.textContent = 'Tap Locate Me for travel distance';
-  }
+  reportTitle.textContent = `${state} overview`;
+  reportAreaName.textContent = `${state} state`;
+  reportPuCount.textContent = formatNumber(stateRow?.pollingUnits || stateLgas.reduce((sum, row) => sum + (Number(row.pollingUnits) || 0), 0));
+  if (reportSummaryAHeader) reportSummaryAHeader.textContent = 'Highest LGA';
+  if (reportSummaryBHeader) reportSummaryBHeader.textContent = 'Lowest LGA';
+  if (reportHighlightAHeader) reportHighlightAHeader.textContent = 'Top polling units';
+  if (reportHighlightBHeader) reportHighlightBHeader.textContent = 'Lowest polling units';
+  reportClosest.textContent = stateLgas.length ? `${stateLgas.reduce((best, row) => (!best || row.pollingUnits > best.pollingUnits ? row : best), null)?.lga || '--'}` : '--';
+  reportFarthest.textContent = stateLgas.length ? `${stateLgas.reduce((worst, row) => (!worst || row.pollingUnits < worst.pollingUnits ? row : worst), null)?.lga || '--'}` : '--';
+
+  const highestLga = stateLgas.reduce((best, row) => (!best || row.pollingUnits > best.pollingUnits ? row : best), null);
+  const lowestLga = stateLgas.reduce((worst, row) => (!worst || row.pollingUnits < worst.pollingUnits ? row : worst), null);
+
+  reportClosestValue.textContent = highestLga?.lga || '--';
+  reportClosestMeta.textContent = highestLga
+    ? `${formatNumber(highestLga.pollingUnits)} PUs • ${formatNumber(highestLga.populationPerPollingUnit, 1)} pop/PU`
+    : '--';
+  reportFarthestValue.textContent = lowestLga?.lga || '--';
+  reportFarthestMeta.textContent = lowestLga
+    ? `${formatNumber(lowestLga.pollingUnits)} PUs • ${formatNumber(lowestLga.populationPerPollingUnit, 1)} pop/PU`
+    : '--';
 
   const suggestions = [];
-  if (!userLatLng) {
-    suggestions.push('Tap Locate Me so the report can show the closest and farthest polling units from your position.');
-  }
-  if (closestDistance !== null && closestDistance > 3) {
-    suggestions.push('The nearest polling unit is farther than expected, so transport support or a new access point may help.');
-  }
-  if (farthestDistance !== null && farthestDistance > 8) {
-    suggestions.push('Some polling units are quite far away, so consider additional outreach or better route planning.');
-  }
-  const row = (pollingData.lgas || []).find(
-    (r) => normalizeLookupKey(r.state) === normalizeLookupKey(state) && normalizeLookupKey(r.lga) === normalizeLookupKey(lga)
-  );
-  if (row?.accessibilityBand === 'Needs More Coverage') {
-    suggestions.push('This LGA needs more coverage, so adding or redistributing polling units would improve access.');
-  } else if (row?.accessibilityBand === 'Watch Pressure') {
-    suggestions.push('This area is under watch pressure, so more support during peak periods would help.');
+  if (!stateLgas.length) {
+    suggestions.push('No LGAs are available for this state.');
   } else {
-    suggestions.push('Coverage looks generally healthy, so keep monitoring and supporting the busiest wards.');
+    suggestions.push('Review the highest- and lowest-count LGAs to understand coverage gaps.');
+    if (highestLga && lowestLga && highestLga.pollingUnits - lowestLga.pollingUnits > 200) {
+      suggestions.push('There is a large imbalance between LGAs, so focus planning on lower-coverage areas.');
+    }
   }
 
+  const statePopulationPerPu = stateRow?.populationPerPollingUnit ?? '--';
   reportSuggestions.innerHTML = suggestions.map((item) => `<li>${item}</li>`).join('');
+  reportListTitle.textContent = `State summary for ${state}`;
+  reportUnitsList.innerHTML = '';
 
-  reportUnitsList.innerHTML = points
-    .map((point) => {
-      const unitName = point.name || 'Polling Unit';
-      const locationText = [point.ward, point.lga, point.state].filter(Boolean).join(', ');
-      const distanceText = userLatLng && Number.isFinite(point._distance)
-        ? `${formatNumber(point._distance, 1)} km`
-        : 'Distance pending';
-      return `<div class="report-unit-item"><strong>${unitName}</strong><span>${locationText}</span><span>${distanceText}</span></div>`;
-    })
-    .join('');
+  updateChart({ state });
 }
 
 function updateDetailsPanel() {
@@ -1051,7 +1251,6 @@ function updateDetailsPanel() {
     pollingUnitsValue.textContent             = formatNumber(row.pollingUnits);
     pollingWardsValue.textContent             = formatNumber(row.wards);
     pollingPopulationLoadValue.textContent    = formatNumber(row.populationPerPollingUnit, 1);
-    pollingUnitsPerPopulationValue.textContent= formatNumber(row.pollingUnitsPer100k, 1);
     pollingBandValue.textContent              = row.accessibilityBand || '--';
     pollingTopAreaValue.textContent           = row.topWards?.[0]
       ? `${row.topWards[0].ward} (${formatNumber(row.topWards[0].pollingUnits)})`
@@ -1068,7 +1267,6 @@ function updateDetailsPanel() {
     pollingUnitsValue.textContent             = formatNumber(row.pollingUnits);
     pollingWardsValue.textContent             = formatNumber(row.wards);
     pollingPopulationLoadValue.textContent    = formatNumber(row.populationPerPollingUnit, 1);
-    pollingUnitsPerPopulationValue.textContent= formatNumber(row.pollingUnitsPer100k, 1);
     pollingBandValue.textContent              = row.accessibilityBand || '--';
     pollingTopAreaValue.textContent           = row.topLgaByPollingUnits
       ? `${row.topLgaByPollingUnits.lga} (${formatNumber(row.topLgaByPollingUnits.pollingUnits)})`
@@ -1083,7 +1281,6 @@ function updateDetailsPanel() {
   pollingUnitsValue.textContent             = formatNumber(summary.totalPollingUnits);
   pollingWardsValue.textContent             = formatNumber(summary.totalWards);
   pollingPopulationLoadValue.textContent    = formatNumber(summary.nationalPopulationPerPollingUnit, 1);
-  pollingUnitsPerPopulationValue.textContent= formatNumber(summary.nationalPollingUnitsPer100k, 1);
   pollingBandValue.textContent              = getNationalBand(summary.nationalPopulationPerPollingUnit);
   pollingTopAreaValue.textContent           = summary.topStateByPollingUnits
     ? `${summary.topStateByPollingUnits.state} (${formatNumber(summary.topStateByPollingUnits.pollingUnits)})`
@@ -1129,6 +1326,7 @@ function updateLgaOptions() {
 function searchArea() {
   const query = normalizeLookupKey(searchInput.value);
   if (!query) { setSearchMessage('Enter a state or LGA name to search.'); return; }
+  if (!pollingData) { setSearchMessage('Polling unit data is still loading. Please try again shortly.'); return; }
 
   const matchState = (pollingData.states || []).find((r) =>
     normalizeLookupKey(r.state).includes(query)
@@ -1138,9 +1336,12 @@ function searchArea() {
     stateSelect.value = matchState.state;
     updateLgaOptions();
     lgaSelect.value = '';
+    clearPollingUnitPointsLayer();
+    loadedPoints = [];
     updateDetailsPanel();
     renderAllBoundaries();
     renderPollingUnitPointsLayer();
+    renderAreaReport();
     const feat = getStateFeatures().find(
       (f) => normalizeLookupKey(getFeatureStateName(f)) === normalizeLookupKey(matchState.state)
     );
@@ -1149,18 +1350,24 @@ function searchArea() {
     return;
   }
 
-  const matchLga = (pollingData.lgas || []).find(
-    (r) => normalizeLookupKey(r.lga).includes(query) ||
-           normalizeLookupKey(`${r.lga} ${r.state}`).includes(query)
-  );
+  const lgaRows = pollingData.lgas || [];
+  const matchLga =
+    lgaRows.find((r) => normalizeLookupKey(r.lga) === query) ||
+    lgaRows.find((r) => normalizeLookupKey(`${r.lga} ${r.state}`) === query) ||
+    lgaRows.find((r) => normalizeLookupKey(r.lga).includes(query)) ||
+    lgaRows.find((r) => normalizeLookupKey(`${r.lga} ${r.state}`).includes(query));
 
   if (matchLga) {
     stateSelect.value = matchLga.state;
     updateLgaOptions();
     lgaSelect.value = matchLga.lga;
+    clearPollingUnitPointsLayer();
+    loadedPoints = [];
     updateDetailsPanel();
     renderAllBoundaries();
     renderPollingUnitPointsLayer();
+    renderAreaReport();
+    zoomToFeature(getLgaFeature());
     setSearchMessage(`Showing ${matchLga.lga}, ${matchLga.state}.`);
     return;
   }
@@ -1171,15 +1378,19 @@ function searchArea() {
 /* ── Render all boundary layers ─────────────────────────────────────────── */
 function renderAllBoundaries() {
   renderStateBoundaries();
+  renderLgaAdminBoundaries();
   renderWardBoundaries();
+  renderLgaBoundary();
   if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
 
-  if (stateSelect.value) {
-    const feat = getStateFeatures().find(
-      (f) => normalizeLookupKey(getFeatureStateName(f)) === normalizeLookupKey(stateSelect.value)
-    );
-    if (feat) setHighlight(feat);
+  const selectedFeature = getSelectedBoundaryFeature();
+  if (selectedFeature) {
+    setHighlight(selectedFeature);
+    constrainMapToFeature(selectedFeature);
+    return;
   }
+
+  resetMapBounds();
 }
 
 /* ── Panel resizer ──────────────────────────────────────────────────────── */
@@ -1244,6 +1455,7 @@ stateSelect.addEventListener('change', () => {
   loadedPoints = [];
   updateDetailsPanel();
   renderAllBoundaries();
+  renderPollingUnitPointsLayer();
   renderAreaReport();
 });
 
@@ -1251,7 +1463,7 @@ document.getElementById('applyPollingFilters').addEventListener('click', () => {
   updateDetailsPanel();
   renderAllBoundaries();
   renderPollingUnitPointsLayer();
-  focusSelectedPollingArea();
+  renderAreaReport();
 });
 
 document.getElementById('resetPollingFilters').addEventListener('click', () => {
@@ -1261,49 +1473,198 @@ document.getElementById('resetPollingFilters').addEventListener('click', () => {
   lgaSelect.value    = '';
   searchInput.value  = '';
   setSearchMessage('');
+  clearPollingUnitPointsLayer();
+  loadedPoints = [];
   updateDetailsPanel();
   renderAllBoundaries();
-  renderPollingUnitPointsLayer();
-  focusSelectedPollingArea();
+  resetMapBounds();
+  if (nigeriaBounds?.isValid()) {
+    map.fitBounds(nigeriaBounds, { padding: [18, 18] });
+  }
   renderAreaReport();
+  closeReportModal();
 });
 
 searchButton.addEventListener('click', searchArea);
-searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); searchArea(); } });
-metricSelect.addEventListener('change', () => { /* metric affects the chart/panel only */ updateDetailsPanel(); });
+searchInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    searchArea();
+  }
+});
+
 lgaSelect.addEventListener('change', () => {
+  clearPollingUnitPointsLayer();
+  loadedPoints = [];
   updateDetailsPanel();
+  renderAllBoundaries();
   renderPollingUnitPointsLayer();
   renderAreaReport();
 });
 
-if (downloadReportButton) {
-  downloadReportButton.addEventListener('click', () => {
-    const state = stateSelect.value;
-    const lga = lgaSelect.value;
-    const features = getFilteredPollingUnitFeatures();
-    const safeArea = (lga && state ? `${lga}-${state}` : state || 'selected-area').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeArea} report</title><style>body{font-family:Arial,sans-serif;background:#071116;color:#f7fbf8;padding:24px}h1{color:#22b573}.card{background:#10212b;border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:16px;margin-bottom:16px}.pill{display:inline-block;padding:8px 12px;border-radius:999px;background:rgba(34,181,115,0.18);margin:4px 6px 4px 0;color:#bfeadb}.item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08)}.suggestion{padding:8px 10px;border-radius:8px;background:rgba(255,191,71,0.16);margin:6px 0}</style></head><body><h1>${(lga && state ? `${lga}, ${state}` : state || 'Selected area')} report</h1><div class="card"><strong>Polling units:</strong> ${features.length}<br><strong>Closest:</strong> ${reportClosest.textContent || '--'}<br><strong>Farthest:</strong> ${reportFarthest.textContent || '--'}</div><div class="card"><h2>Suggestions</h2>${reportSuggestions.innerHTML.replace(/<li>/g, '<div class="suggestion">').replace(/<\/li>/g, '</div>')}</div><div class="card"><h2>All polling units</h2>${reportUnitsList.innerHTML}</div></body></html>`;
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${safeArea}-report.html`;
-    link.click();
-    URL.revokeObjectURL(url);
-  });
+function openReportModal() {
+  if (!reportModal) return;
+  reportModal.classList.remove('is-hidden');
+  document.body.style.overflow = 'hidden';
 }
+
+function closeReportModal() {
+  if (!reportModal) return;
+  reportModal.classList.add('is-hidden');
+  document.body.style.overflow = '';
+}
+
+viewReportButton?.addEventListener('click', () => {
+  renderAreaReport();
+  openReportModal();
+});
+
+reportModalClose?.addEventListener('click', closeReportModal);
+reportModalBackdrop?.addEventListener('click', (event) => {
+  if (event.target === reportModalBackdrop) closeReportModal();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && reportModal && !reportModal.classList.contains('is-hidden')) {
+    closeReportModal();
+  }
+});
+
+async function downloadPollingReportPdf() {
+  const state = stateSelect.value;
+  const lga = lgaSelect.value;
+  if (!state) {
+    alert('Select a state or LGA before downloading a report.');
+    return;
+  }
+
+  if (!window.jspdf?.jsPDF) {
+    alert('The PDF generator is not available. Please refresh the page and try again.');
+    return;
+  }
+
+  const stateFeatures = allPollingUnitFeatures.filter(
+    (feature) => normalizeLookupKey(feature.properties.state) === normalizeLookupKey(state)
+  );
+  const areaFeatures = lga
+    ? stateFeatures.filter((feature) => normalizeLookupKey(feature.properties.lga) === normalizeLookupKey(lga))
+    : stateFeatures;
+  if (!areaFeatures.length) {
+    alert('No polling units were found for the selected area.');
+    return;
+  }
+
+  const stateLgas = (pollingData.lgas || []).filter(
+    (row) => normalizeLookupKey(row.state) === normalizeLookupKey(state)
+  );
+  const highestLga = stateLgas.reduce((best, row) => !best || row.pollingUnits > best.pollingUnits ? row : best, null);
+  const lowestLga = stateLgas.reduce((best, row) => !best || row.pollingUnits < best.pollingUnits ? row : best, null);
+  const nearest = userLatLng
+    ? areaFeatures
+      .map((feature) => {
+        const [lng, lat] = feature.geometry.coordinates || [];
+        const distance = Number.isFinite(lat) && Number.isFinite(lng)
+          ? userLatLng.distanceTo(L.latLng(lat, lng))
+          : Infinity;
+        return { feature, distance };
+      })
+      .filter((item) => Number.isFinite(item.distance))
+      .sort((a, b) => a.distance - b.distance)[0]
+    : null;
+
+  let driving = null;
+  if (nearest) {
+    const [lng, lat] = nearest.feature.geometry.coordinates;
+    driving = await fetchOsrmRouteMetrics([userLatLng.lng, userLatLng.lat], [lng, lat]);
+  }
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const margin = 16;
+  const contentWidth = pageWidth - margin * 2;
+  const areaName = lga ? `${lga}, ${state}` : `${state} State`;
+  const addText = (text, x, y, maxWidth, options = {}) => {
+    pdf.setFontSize(options.size || 10);
+    pdf.setTextColor(...(options.color || [30, 48, 61]));
+    pdf.setFont('helvetica', options.bold ? 'bold' : 'normal');
+    pdf.text(pdf.splitTextToSize(String(text), maxWidth), x, y);
+  };
+  const metricCard = (x, y, label, value, color) => {
+    pdf.setFillColor(...color);
+    pdf.roundedRect(x, y, 54, 26, 3, 3, 'F');
+    addText(label, x + 4, y + 8, 46, { size: 7.5, color: [255, 255, 255], bold: true });
+    addText(value, x + 4, y + 18, 46, { size: 13, color: [255, 255, 255], bold: true });
+  };
+
+  pdf.setFillColor(14, 76, 96);
+  pdf.rect(0, 0, pageWidth, 45, 'F');
+  addText('POLLING UNITS ACCESSIBILITY REPORT', margin, 16, 170, { size: 17, color: [255, 255, 255], bold: true });
+  addText(areaName, margin, 25, 170, { size: 12, color: [197, 240, 224], bold: true });
+  addText(`Generated ${new Date().toLocaleDateString('en-NG', { dateStyle: 'long' })}`, margin, 34, 170, { size: 8, color: [224, 243, 248] });
+
+  metricCard(margin, 53, 'STATE', state, [39, 132, 143]);
+  metricCard(margin + 58, 53, 'NUMBER OF LGAS', formatNumber(stateLgas.length), [56, 115, 177]);
+  metricCard(margin + 116, 53, 'IDENTIFIED POLLING UNITS', formatNumber(stateFeatures.length), [203, 107, 61]);
+
+  addText('Polling unit coverage by LGA', margin, 92, contentWidth, { size: 13, bold: true, color: [14, 76, 96] });
+  const maxValue = Math.max(highestLga?.pollingUnits || 1, lowestLga?.pollingUnits || 1);
+  const chartRows = [
+    { label: `Highest: ${highestLga?.lga || '--'}`, value: highestLga?.pollingUnits || 0, color: [28, 159, 118] },
+    { label: `Lowest: ${lowestLga?.lga || '--'}`, value: lowestLga?.pollingUnits || 0, color: [235, 123, 72] },
+  ];
+  chartRows.forEach((row, index) => {
+    const y = 101 + index * 18;
+    addText(row.label, margin, y, 62, { size: 9, bold: true });
+    pdf.setFillColor(228, 238, 241);
+    pdf.roundedRect(margin + 64, y - 5, 94, 8, 2, 2, 'F');
+    pdf.setFillColor(...row.color);
+    pdf.roundedRect(margin + 64, y - 5, Math.max(4, 94 * row.value / maxValue), 8, 2, 2, 'F');
+    addText(formatNumber(row.value), margin + 162, y + 1, 24, { size: 9, bold: true, color: row.color });
+  });
+
+  addText('Closest polling unit to you', margin, 146, contentWidth, { size: 13, bold: true, color: [14, 76, 96] });
+  pdf.setFillColor(242, 250, 247);
+  pdf.roundedRect(margin, 152, contentWidth, 37, 3, 3, 'F');
+  if (nearest) {
+    const props = nearest.feature.properties || {};
+    const travelDistance = driving ? formatDistance(driving.distance || nearest.distance) : formatDistance(nearest.distance);
+    const walkingTime = formatDuration(estimateWalkingDuration(nearest.distance));
+    const drivingTime = driving ? formatDuration(driving.duration) : 'Road time unavailable';
+    addText(props.name || 'Polling Unit', margin + 5, 162, contentWidth - 10, { size: 11, bold: true, color: [22, 91, 83] });
+    addText([props.ward, props.lga, props.state].filter(Boolean).join(', '), margin + 5, 169, contentWidth - 10, { size: 8.5 });
+    addText(`Travel distance: ${travelDistance}   |   Walking: ${walkingTime}   |   Driving: ${drivingTime}`, margin + 5, 180, contentWidth - 10, { size: 9, bold: true, color: [30, 48, 61] });
+  } else {
+    addText('Enable User Location before downloading the report to include the closest polling unit, travel distance, and travel time.', margin + 5, 164, contentWidth - 10, { size: 9 });
+  }
+
+  addText('Report scope', margin, 202, contentWidth, { size: 11, bold: true, color: [14, 76, 96] });
+  addText(`The report covers ${lga ? `${lga} within ${state}` : `${state} State`} and is based on ${formatNumber(areaFeatures.length)} identified polling-unit records.`, margin, 211, contentWidth, { size: 9 });
+  addText('Nigeria Election GIS Dashboard', margin, 283, contentWidth, { size: 8, color: [92, 112, 122] });
+
+  const fileName = `${lga ? `${lga}-${state}` : state}-polling-units-report.pdf`
+    .replace(/[^a-z0-9\-\.]+/gi, '-').toLowerCase();
+  pdf.save(fileName);
+}
+
+if (downloadReportButton) {
+  downloadReportButton.addEventListener('click', downloadPollingReportPdf);
+}
+downloadPdfReportButton?.addEventListener('click', downloadPollingReportPdf);
 
 window.addEventListener('resize', () => window.requestAnimationFrame(() => map.invalidateSize()));
 
 /* ── Init ───────────────────────────────────────────────────────────────── */
 async function initPollingMap() {
   try {
-    [adm0Data, adm1Data, pollingData] = await Promise.all([
+    [adm0Data, adm1Data, adm2Data, pollingData] = await Promise.all([
       loadBoundary('data/boundaries/adm0.zip'),
       loadBoundary('data/boundaries/adm1.zip'),
+      loadBoundary('data/boundaries/adm2.zip'),
       loadPollingDashboardData(),
     ]);
+
+    // The selected-LGA outline uses the same complete ADM2 dataset as the map layer.
+    lgaData = adm2Data;
 
     nigeriaBounds = L.geoJSON(adm0Data).getBounds();
 

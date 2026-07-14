@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Latest Election Results | Nigeria Election GIS Dashboard</title>
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="dashboard-page results-page">
+    <aside class="side-nav">
+      <a class="side-brand" href="index.html">
+        <img src="assets/geoinfotech-logo.jpeg" alt="GEOINFOTECH logo" />
+        <span><strong>Nigeria</strong><small>Election GIS</small></span>
+      </a>
+      <nav aria-label="Dashboard pages">
+        <a href="index.html">Overview</a>
+        <a href="population.html">Population &amp; Demographics</a>
+        <a href="polling-units.html">Polling Units &amp; Accessibility</a>
+        <a class="active" href="election-results.html">Latest Election Results</a>
+      </nav>
+      <section class="results-source-card">
+        <span class="live-dot"></span>
+        <strong>Live news connected</strong>
+        <p>Live headlines come from BBC News Africa and GDELT, with verified result reports available below.</p>
+        <button id="refreshResultsButton" type="button">Refresh results</button>
+      </section>
+    </aside>
+
+    <main class="dashboard-main results-main">
+      <header class="dashboard-header">
+        <div>
+          <p class="page-kicker">Election status map</p>
+          <h1>Latest Election Results</h1>
+          <p id="resultDate" class="polling-source-summary">Loading declared result…</p>
+        </div>
+        <a class="header-button" href="index.html">Back to Homepage</a>
+      </header>
+
+      <section class="results-map-section" aria-labelledby="electionMapHeading">
+        <div class="results-map-heading">
+          <div><p class="page-kicker">Map layers</p><h2 id="electionMapHeading">Election status by state</h2></div>
+          <div class="map-heading-actions"><div class="election-map-legend" aria-label="Map legend"><span><i class="election-complete-dot"></i> Election completed</span><span><i class="election-pending-dot"></i> Not yet held</span></div><button id="resetElectionMap" type="button">View all states</button></div>
+        </div>
+        <div class="results-map-grid">
+          <div id="electionResultsMap" aria-label="Nigeria election status map"></div>
+          <aside id="stateMapDetails" class="state-map-details" aria-live="polite"><p class="page-kicker">Selected state</p><h3>Loading map…</h3><p>State boundaries are loading.</p></aside>
+        </div>
+      </section>
+
+      <div class="result-details-heading"><p class="page-kicker">Selected election</p><h2>Declared result details</h2></div>
+
+      <section id="resultDetails" class="winner-card" aria-labelledby="winnerHeading">
+        <div class="winner-medallion">WIN</div>
+        <div>
+          <p class="page-kicker">Declared winner</p>
+          <h2 id="winnerHeading">Loading…</h2>
+          <p id="winnerParty">—</p>
+        </div>
+        <div class="winner-votes"><span>Votes received</span><strong id="winnerVotes">—</strong></div>
+      </section>
+
+      <section class="results-stat-grid" aria-label="Election summary">
+        <article><span>LGAs won</span><strong id="lgasWon">—</strong></article>
+        <article><span>Accredited voters</span><strong id="accreditedVoters">—</strong></article>
+        <article><span>Valid votes</span><strong id="validVotes">—</strong></article>
+        <article><span>Rejected votes</span><strong id="rejectedVotes">—</strong></article>
+      </section>
+
+      <section class="results-content-grid">
+        <article class="results-panel">
+          <div class="panel-heading"><div><p class="page-kicker">Candidate performance</p><h2>Vote totals</h2></div><span id="candidateCount" class="result-tag">—</span></div>
+          <div id="candidateResults" class="candidate-results" aria-live="polite"></div>
+        </article>
+        <aside class="results-panel sources-panel">
+          <div class="panel-heading"><div><p class="page-kicker">Verification</p><h2>Result sources</h2></div></div>
+          <div id="resultSources" class="result-sources"></div>
+          <div class="panel-heading news-heading"><div><p class="page-kicker">Live news feed</p><h2>BBC Africa &amp; related coverage</h2></div></div>
+          <div id="newsFeed" class="news-feed"><p class="loading-copy">Loading live news…</p></div>
+        </aside>
+      </section>
+    </main>
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/shpjs/shp.min.js"></script>
+    <script src="election-results.js"></script>
+  </body>
+</html>
