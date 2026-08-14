@@ -125,6 +125,8 @@ let highlightLayer       = null;
 /* Polling points (loaded once as static GeoJSON, like a shapefile) */
 let allPollingUnitFeatures = [];   // all GeoJSON features from the server
 let loadedPoints = [];             // flat array of properties for nearest-route calc
+let loadedPollingPointAreaKey = '';
+let pollingPointRequestKey = '';
 
 /* User geolocation */
 let userLatLng = null;
@@ -693,17 +695,27 @@ async function fetchTravelTimes(origin, destination) {
 function renderPollingUnitPointsLayer() {
   clearPollingUnitPointsLayer();
   loadedPoints = [];
-  if (!togglePollingUnits.checked || !allPollingUnitFeatures.length || !stateSelect.value) return;
+  if (!togglePollingUnits.checked || !stateSelect.value) return;
 
   const state = stateSelect.value;
   const lga   = lgaSelect.value;
+  const areaKey = `${normalizeLookupKey(state)}::${normalizeLookupKey(lga)}`;
+  if (loadedPollingPointAreaKey !== areaKey) {
+    void loadPollingUnitPointsGeoJSON();
+    return;
+  }
+  if (!allPollingUnitFeatures.length) return;
   const boundaryFeature = getSelectedBoundaryFeature();
   if (!boundaryFeature) return;
 
   let features = allPollingUnitFeatures
     .filter((f) => normalizeLookupKey(f.properties.state) === normalizeLookupKey(state))
-    .filter((f) => !lga || normalizeLookupKey(f.properties.lga) === normalizeLookupKey(lga))
-    .filter((f) => isPointInGeoFeature(f.geometry.coordinates, boundaryFeature));
+    .filter((f) => !lga || normalizeLookupKey(f.properties.lga) === normalizeLookupKey(lga));
+
+  // Many records in the supplied register have no coordinates. Place those
+  // records at stable estimated positions within the selected boundary so the
+  // complete polling-unit list remains visible.
+  features = features.map((feature, index) => placePollingPointInBoundary(feature, boundaryFeature, index));
 
   if (!features.length) return;
 
@@ -797,13 +809,64 @@ function focusSelectedPollingArea() {
   }
 }
 
+function pointSeed(value) {
+  let hash = 2166136261;
+  for (const char of String(value || '')) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967296;
+}
+
+function placePollingPointInBoundary(feature, boundaryFeature, index) {
+  const coordinates = feature?.geometry?.coordinates;
+  if (Array.isArray(coordinates) && isPointInGeoFeature(coordinates, boundaryFeature)) return feature;
+
+  const bounds = L.geoJSON(boundaryFeature).getBounds();
+  const seed = `${feature?.properties?.name || ''}:${feature?.properties?.ward || ''}:${index}`;
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const longitude = bounds.getWest() + (bounds.getEast() - bounds.getWest()) * pointSeed(`${seed}:x:${attempt}`);
+    const latitude = bounds.getSouth() + (bounds.getNorth() - bounds.getSouth()) * pointSeed(`${seed}:y:${attempt}`);
+    if (isPointInGeoFeature([longitude, latitude], boundaryFeature)) {
+      return {
+        ...feature,
+        geometry: { ...feature.geometry, coordinates: [longitude, latitude] },
+        properties: { ...feature.properties, geometrySource: 'boundary-estimate' },
+      };
+    }
+  }
+
+  const centre = bounds.getCenter();
+  return {
+    ...feature,
+    geometry: { ...feature.geometry, coordinates: [centre.lng, centre.lat] },
+    properties: { ...feature.properties, geometrySource: 'boundary-estimate' },
+  };
+}
+
 async function loadPollingUnitPointsGeoJSON() {
+  const state = stateSelect.value;
+  const lga = lgaSelect.value;
+  if (!state) {
+    allPollingUnitFeatures = [];
+    loadedPollingPointAreaKey = '';
+    return;
+  }
+
+  const areaKey = `${normalizeLookupKey(state)}::${normalizeLookupKey(lga)}`;
+  if (pollingPointRequestKey === areaKey) return;
+  pollingPointRequestKey = areaKey;
+
   try {
     pollingSourceSummary.textContent = 'Loading polling unit points…';
-    const response = await fetch('/api/polling-units.geojson');
+    const query = new URLSearchParams({ state });
+    if (lga) query.set('lga', lga);
+    const response = await fetch(`/api/polling-units.geojson?${query}`);
     if (!response.ok) throw new Error('Unable to load polling unit GeoJSON.');
     const geojson = await response.json();
+    if (pollingPointRequestKey !== areaKey) return;
     allPollingUnitFeatures = geojson.features || [];
+    loadedPollingPointAreaKey = areaKey;
     const counts = geojson?.source?.counts || {};
     const estimatedCount = Number(counts.estimated || 0);
     const geocodedCount = Number(counts.geocoded || 0);
@@ -814,9 +877,12 @@ async function loadPollingUnitPointsGeoJSON() {
       (estimatedCount || geocodedCount || csvCount
         ? ` · ${formatNumber(exactCount)} exact, ${formatNumber(csvCount)} CSV, ${formatNumber(geocodedCount)} geocoded, ${formatNumber(estimatedCount)} estimated`
         : '');
+    renderPollingUnitPointsLayer();
   } catch (error) {
     console.warn('Failed to load polling unit GeoJSON:', error);
     pollingSourceSummary.textContent = 'Failed to load polling unit points.';
+  } finally {
+    if (pollingPointRequestKey === areaKey) pollingPointRequestKey = '';
   }
 }
 
@@ -1688,8 +1754,7 @@ async function initPollingMap() {
 
     renderAllBoundaries();
 
-    /* load polling unit points as a static GeoJSON layer (like a shapefile) */
-    loadPollingUnitPointsGeoJSON();
+    pollingSourceSummary.textContent = 'Select a state to display its polling-unit points.';
   } catch (error) {
     console.error('Failed to initialize polling dashboard:', error);
     pollingSourceSummary.textContent = error.message || 'Failed to load.';

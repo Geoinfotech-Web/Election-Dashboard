@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body class="dashboard-page">
+  <body class="dashboard-page population-page">
     <aside class="side-nav">
       <a class="side-brand" href="index.html">
         <img src="assets/geoinfotech-logo.jpeg" alt="GEOINFOTECH logo" />
@@ -57,6 +57,18 @@
           <select id="lgaSelect">
             <option value="">All LGAs</option>
           </select>
+        </label>
+
+        <label>
+          Fill opacity
+          <input id="fillOpacityRange" type="range" min="0" max="100" value="95" />
+          <output id="fillOpacityValue">95%</output>
+        </label>
+
+        <label>
+          Stroke weight
+          <input id="strokeWeightRange" type="range" min="0" max="10" value="2" />
+          <output id="strokeWeightValue">2</output>
         </label>
 
         <button id="applyFilters" type="button">Apply Filter</button>

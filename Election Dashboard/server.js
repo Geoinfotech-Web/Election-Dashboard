@@ -330,7 +330,7 @@ function normalizePollingUnitPointRow(row) {
       row.STATE
   );
   const lga = toDisplayCase(
-    getFieldValue(row, ['lga', 'lga_name', 'lgaName', 'local_government_area', 'localgovernmentarea']) ||
+    getFieldValue(row, ['lga', 'lg', 'lga_name', 'lgaName', 'local_government_area', 'localgovernmentarea']) ||
       getFieldValue(row, ['local_government_name']) ||
       row.LGA ||
       row.lga_name
@@ -345,12 +345,13 @@ function normalizePollingUnitPointRow(row) {
       'polling_unit_name',
       'pollingunitname',
       'pu_name',
+      'location',
       'name',
     ]) ||
       row.polling_unit_name ||
       row.name
   );
-  const sourceName = toDisplayCase(getFieldValue(row, ['name']) || row.name);
+  const sourceName = toDisplayCase(getFieldValue(row, ['location', 'name']) || row.location || row.name);
 
   const latitudeCandidates = [
     'lat',
@@ -475,6 +476,45 @@ async function loadLocalPollingUnitCoordinateOverrides() {
 
     throw error;
   }
+}
+
+async function loadLocalPollingUnitPoints() {
+  const csvText = await fs.readFile(LOCAL_POLLING_UNIT_DATA_PATH, 'utf8');
+  const parsed = Papa.parse(csvText, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (header) => String(header || '').trim(),
+  });
+
+  if (parsed.errors?.length) {
+    console.warn('Local polling unit CSV parsed with warnings:', parsed.errors[0]);
+  }
+
+  return (parsed.data || [])
+    .map((row) => normalizePollingUnitPointRow(row))
+    .filter((point) => point.state && point.lga && point.code);
+}
+
+async function loadLocalPollingUnitPointsForArea({ state, lga } = {}) {
+  const csvText = await fs.readFile(LOCAL_POLLING_UNIT_DATA_PATH, 'utf8');
+  const [header, ...lines] = csvText.split(/\r?\n/);
+  const stateKey = normalizeLookupKey(state);
+  const lgaKey = normalizeLookupKey(lga);
+  const matchingLines = lines.filter((line) => {
+    const columns = line.split(',', 4);
+    return normalizeLookupKey(columns[1]) === stateKey &&
+      (!lgaKey || normalizeLookupKey(columns[2]) === lgaKey);
+  });
+
+  const parsed = Papa.parse([header, ...matchingLines].join('\n'), {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (column) => String(column || '').trim(),
+  });
+
+  return (parsed.data || [])
+    .map((row) => normalizePollingUnitPointRow(row))
+    .filter((point) => point.state && point.lga && point.code);
 }
 
 async function resolvePollingUnitCoordinates(points) {
@@ -615,30 +655,33 @@ async function loadPollingUnitPoints() {
     return pollingUnitPointsCache;
   }
 
-  const response = await fetch(POLLING_UNIT_POINTS_SOURCE_URL, {
-    headers: {
-      accept: 'text/csv',
-    },
-  });
+  let points;
+  try {
+    const response = await fetch(POLLING_UNIT_POINTS_SOURCE_URL, {
+      headers: { accept: 'text/csv' },
+      signal: AbortSignal.timeout(12000),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Failed to load polling unit points: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Failed to load polling unit points: ${response.status}`);
+    }
+
+    const csvText = await response.text();
+    const parsed = Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => String(header || '').trim(),
+    });
+
+    if (parsed.errors?.length) {
+      console.warn('Polling unit points CSV parsed with warnings:', parsed.errors[0]);
+    }
+
+    points = (parsed.data || []).map((row) => normalizePollingUnitPointRow(row)).filter(Boolean);
+  } catch (error) {
+    console.warn('Remote polling point source unavailable; using local polling-unit CSV:', error.message || error);
+    points = await loadLocalPollingUnitPoints();
   }
-
-  const csvText = await response.text();
-  const parsed = Papa.parse(csvText, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: (header) => String(header || '').trim(),
-  });
-
-  if (parsed.errors?.length) {
-    console.warn('Polling unit points CSV parsed with warnings:', parsed.errors[0]);
-  }
-
-  const points = (parsed.data || [])
-    .map((row) => normalizePollingUnitPointRow(row))
-    .filter(Boolean);
 
   const localOverrides = await loadLocalPollingUnitCoordinateOverrides();
   const mergedPoints = points.map((point) => {
@@ -659,6 +702,13 @@ async function loadPollingUnitPoints() {
 
   pollingUnitPointsCache = resolvedPoints;
   return resolvedPoints;
+}
+
+// Load and resolve only the selected area for interactive map requests. This
+// avoids sending the entire national register before the user chooses a state.
+async function loadPollingUnitPointsForArea({ state, lga } = {}) {
+  const areaPoints = await loadLocalPollingUnitPointsForArea({ state, lga });
+  return resolvePollingUnitCoordinates(areaPoints);
 }
 
 function buildPollingUnitPointResponse(points, { state, lga, bbox } = {}) {
@@ -1308,6 +1358,35 @@ const EKITI_2026_RESULT = {
   ],
 };
 
+// Archived results are curated election records. Headlines can surface useful
+// coverage, but NewsAPI is not an authoritative vote-count database.
+const ELECTION_RESULT_ARCHIVE = {
+  ekiti: [
+    EKITI_2026_RESULT,
+    {
+      election: 'Ekiti State Governorship Election 2022', state: 'Ekiti', electionDate: '2022-06-18', declaredDate: '2022-06-19',
+      winner: { name: 'Biodun Oyebanji', party: 'APC', votes: 187057 },
+      candidates: [{ name: 'Biodun Oyebanji', party: 'APC', votes: 187057 }, { name: 'Segun Oni', party: 'SDP', votes: 82211 }, { name: 'Bisi Kolawole', party: 'PDP', votes: 67457 }],
+      totals: { accreditedVoters: 363438, validVotes: 338130, rejectedVotes: 4453, lgAsWon: 15 },
+      sources: [{ publisher: 'INEC', title: 'Independent National Electoral Commission', url: 'https://www.inecnigeria.org/' }],
+    },
+    {
+      election: 'Ekiti State Governorship Election 2018', state: 'Ekiti', electionDate: '2018-07-14', declaredDate: '2018-07-15',
+      winner: { name: 'Kayode Fayemi', party: 'APC', votes: 197459 },
+      candidates: [{ name: 'Kayode Fayemi', party: 'APC', votes: 197459 }, { name: 'Olusola Eleka', party: 'PDP', votes: 178121 }],
+      totals: { accreditedVoters: 328172, validVotes: 321037, rejectedVotes: 7729, lgAsWon: 12 },
+      sources: [{ publisher: 'INEC', title: 'Independent National Electoral Commission', url: 'https://www.inecnigeria.org/' }],
+    },
+    {
+      election: 'Ekiti State Governorship Election 2014', state: 'Ekiti', electionDate: '2014-06-21', declaredDate: '2014-06-22',
+      winner: { name: 'Ayodele Fayose', party: 'PDP', votes: 203090 },
+      candidates: [{ name: 'Ayodele Fayose', party: 'PDP', votes: 203090 }, { name: 'Kayode Fayemi', party: 'APC', votes: 120433 }],
+      totals: { accreditedVoters: 360455, validVotes: 323909, rejectedVotes: 7507, lgAsWon: 16 },
+      sources: [{ publisher: 'INEC', title: 'Independent National Electoral Commission', url: 'https://www.inecnigeria.org/' }],
+    },
+  ],
+};
+
 const BBC_AFRICA_RSS_URL = 'https://feeds.bbci.co.uk/news/world/africa/rss.xml';
 const NEWS_API_KEY = process.env.NEWS_API_KEY || '';
 
@@ -1347,10 +1426,10 @@ async function fetchBbcAfricaNews() {
   return parseBbcRss(await response.text()).slice(0, 4);
 }
 
-async function fetchNewsApiElectionNews() {
+async function fetchNewsApiElectionNews(state = 'Ekiti') {
   if (!NEWS_API_KEY) return [];
   const url = new URL('https://newsapi.org/v2/everything');
-  url.searchParams.set('q', 'Ekiti governorship election');
+  url.searchParams.set('q', `${state} Nigeria election`);
   url.searchParams.set('language', 'en');
   url.searchParams.set('sortBy', 'publishedAt');
   url.searchParams.set('pageSize', '8');
@@ -1367,13 +1446,15 @@ async function fetchNewsApiElectionNews() {
   })).filter((article) => article.title && article.url);
 }
 
-app.get('/api/election-results/ekiti', async (req, res) => {
+async function getElectionResultResponse(state) {
+  const stateName = toDisplayCase(state || 'Ekiti');
+  const archive = ELECTION_RESULT_ARCHIVE[normalizeLookupKey(stateName)] || [];
   let bbcNews = [];
   let newsApiNews = [];
   let gdeltNews = [];
-  const query = encodeURIComponent('Ekiti governorship election 2026 result');
+  const query = encodeURIComponent(`${stateName} Nigeria election result`);
   const [newsApiResult, bbcResult, gdeltResult] = await Promise.allSettled([
-    fetchNewsApiElectionNews(),
+    fetchNewsApiElectionNews(stateName),
     fetchBbcAfricaNews(),
     fetch(`https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=artlist&format=json&maxrecords=6&sort=datedesc`, { signal: AbortSignal.timeout(8000) }),
   ]);
@@ -1396,17 +1477,36 @@ app.get('/api/election-results/ekiti', async (req, res) => {
     .slice(0, 8);
 
   if (!news.length) {
-    news.push(...EKITI_2026_RESULT.sources.map((source) => ({ title: source.title, url: source.url, source: source.publisher, publishedAt: EKITI_2026_RESULT.declaredDate })));
+    news.push(...(archive[0]?.sources || []).map((source) => ({ title: source.title, url: source.url, source: source.publisher, publishedAt: archive[0].declaredDate })));
   }
 
+  return { state: stateName, latest: archive[0] || null, history: archive.slice(1), news, newsApi: 'NewsAPI + BBC News Africa RSS + GDELT 2.1 DOC API' };
+}
+
+app.get('/api/election-results', async (req, res) => {
+  try {
+    const payload = await getElectionResultResponse(req.query.state);
+    res.setHeader('Cache-Control', 'public, max-age=900');
+    return res.json(payload);
+  } catch (error) {
+    console.error('Election results refresh unavailable:', error.message || error);
+    return res.status(500).json({ error: 'Unable to load election results.' });
+  }
+});
+
+// Preserve the original endpoint for existing bookmarks and integrations.
+app.get('/api/election-results/ekiti', async (req, res) => {
+  const payload = await getElectionResultResponse('Ekiti');
   res.setHeader('Cache-Control', 'public, max-age=900');
-  return res.json({ ...EKITI_2026_RESULT, news, newsApi: 'NewsAPI + BBC News Africa RSS + GDELT 2.1 DOC API' });
+  return res.json({ ...payload.latest, history: payload.history, news: payload.news, newsApi: payload.newsApi });
 });
 
 app.get('/api/polling-unit-points', async (req, res) => {
   try {
     const [points, dashboardData] = await Promise.all([
-      loadPollingUnitPoints(),
+      req.query.state
+        ? loadPollingUnitPointsForArea({ state: req.query.state, lga: req.query.lga })
+        : loadPollingUnitPoints(),
       buildPollingUnitDashboardData(LOCAL_POPULATION_DATA_PATH),
     ]);
 
@@ -1455,23 +1555,12 @@ app.get('/api/polling-unit-points', async (req, res) => {
 
 app.get('/api/polling-units.geojson', async (req, res) => {
   try {
-    const [points, dashboardData] = await Promise.all([
-      loadPollingUnitPoints(),
-      buildPollingUnitDashboardData(LOCAL_POPULATION_DATA_PATH),
-    ]);
-
-    const lgaLookup = new Map(
-      (dashboardData.lgas || []).map((row) => [
-        `${normalizeLookupKey(row.state)}::${normalizeLookupKey(row.lga)}`,
-        row,
-      ])
-    );
+    const points = req.query.state
+      ? await loadPollingUnitPointsForArea({ state: req.query.state, lga: req.query.lga })
+      : await loadPollingUnitPoints();
 
     const features = points
       .map((point) => {
-        const lgaRow = lgaLookup.get(
-          `${normalizeLookupKey(point.state)}::${normalizeLookupKey(point.lga)}`
-        );
         return {
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [point.longitude, point.latitude] },
@@ -1480,9 +1569,9 @@ app.get('/api/polling-units.geojson', async (req, res) => {
             state: point.state || '',
             lga: point.lga || '',
             ward: point.ward || '',
-            band: lgaRow?.accessibilityBand || '',
-            pop_pu: lgaRow?.populationPerPollingUnit ?? null,
-            pu_100k: lgaRow?.pollingUnitsPer100k ?? null,
+            band: '',
+            pop_pu: null,
+            pu_100k: null,
             geometrySource: point.geometrySource || 'source',
             sourceLatitude: point.sourceLatitude ?? null,
             sourceLongitude: point.sourceLongitude ?? null,

@@ -73,6 +73,10 @@ const uncollectedPVCLabel = document.getElementById('uncollectedPVCLabel');
 const uncollectedPVCValue = document.getElementById('uncollectedPVCValue');
 const geopoliticalZoneLabel = document.getElementById('geopoliticalZoneLabel');
 const geopoliticalZoneValue = document.getElementById('geopoliticalZoneValue');
+const fillOpacityRange = document.getElementById('fillOpacityRange');
+const fillOpacityValue = document.getElementById('fillOpacityValue');
+const strokeWeightRange = document.getElementById('strokeWeightRange');
+const strokeWeightValue = document.getElementById('strokeWeightValue');
 
 let adm0Data = null;
 let adm1Data = null;
@@ -120,11 +124,11 @@ const POPULATION_DATA_RECONNECT_KEY = 'populationDataReconnectAt';
 const NIGERIA_BOUNDS_PADDING = 0.08;
 const CHOROPLETH_CLASS_COUNT = 5;
 const CHOROPLETH_CLASS_SCHEME = [
-  { color: '#ffffb2', label: 'Lowest' },
-  { color: '#fecc5c', label: 'Low' },
-  { color: '#fd8d3c', label: 'Medium' },
-  { color: '#f03b20', label: 'High' },
-  { color: '#bd0026', label: 'Highest' },
+  { color: '#f2f0f7', label: 'Lowest' },
+  { color: '#dadaf6', label: 'Low' },
+  { color: '#b197e8', label: 'Medium' },
+  { color: '#8b5de9', label: 'High' },
+  { color: '#5a2c9f', label: 'Highest' },
 ];
 const CHOROPLETH_METRICS = {
   population: {
@@ -147,6 +151,10 @@ const NIGERIA_PROFILE = {
   lgaCount: '774 LGAs',
   government: 'Federal republic',
 };
+
+// UI overrides for choropleth rendering (controlled via sidebar sliders)
+let globalFillOpacityPercent = 95; // percent
+let globalStrokeWeight = 2; // pixels
 
 const FALLBACK_NIGERIA_SUMMARY = {
   population: 360722474,
@@ -623,12 +631,18 @@ function getLegendLayerStyle(feature, level, breaks = currentChoroplethBreaks) {
   const isMuted = classState === 'muted';
   const isActive = classState === 'active';
 
+  const baseColor = isMuted ? 'rgba(13, 37, 44, 0.28)' : level === 'lga' ? '#1f6f54' : '#0b4d36';
+  const baseWeight = isActive ? 3 : level === 'country' ? 3.4 : level === 'state' ? 2.4 : 1.2;
+  const finalWeight = typeof globalStrokeWeight === 'number' && globalStrokeWeight >= 0 ? globalStrokeWeight : baseWeight;
+  const baseFill = classIndex === null ? baseFillOpacity : isMuted ? 0.45 : 0.95;
+  const finalFillOpacity = Math.min(1, Math.max(0, baseFill * (Number(globalFillOpacityPercent) / 100)));
+
   return {
-    color: isMuted ? 'rgba(13, 37, 44, 0.28)' : level === 'lga' ? '#1f6f54' : '#0b4d36',
-    weight: isActive ? 3 : level === 'country' ? 3.4 : level === 'state' ? 2.4 : 1.2,
+    color: baseColor,
+    weight: finalWeight,
     opacity: isMuted ? 0.5 : 1,
     fillColor: classIndex === null ? '#6f7d78' : getChoroplethClassColor(classIndex),
-    fillOpacity: classIndex === null ? baseFillOpacity : isMuted ? 0.45 : 0.95,
+    fillOpacity: finalFillOpacity,
     dashArray: isMuted ? '3 4' : '',
   };
 }
@@ -847,6 +861,27 @@ function setDonut(collectedRate, uncollectedRate) {
   pvcDonut.style.background = `conic-gradient(#18a768 0 ${collectedRate}%, #f0c95b ${collectedRate}% 100%)`;
   collectedLegend.textContent = formatPercent(collectedRate);
   uncollectedLegend.textContent = formatPercent(uncollectedRate);
+}
+
+function initializeOpacityControls() {
+  if (fillOpacityRange && fillOpacityValue) {
+    fillOpacityRange.addEventListener('input', (e) => {
+      globalFillOpacityPercent = Number(e.target.value);
+      fillOpacityValue.textContent = `${globalFillOpacityPercent}%`;
+      updateRenderedLayerStyles();
+    });
+    // set initial display
+    fillOpacityValue.textContent = `${globalFillOpacityPercent}%`;
+  }
+
+  if (strokeWeightRange && strokeWeightValue) {
+    strokeWeightRange.addEventListener('input', (e) => {
+      globalStrokeWeight = Number(e.target.value);
+      strokeWeightValue.textContent = `${globalStrokeWeight}`;
+      updateRenderedLayerStyles();
+    });
+    strokeWeightValue.textContent = `${globalStrokeWeight}`;
+  }
 }
 
 function updateDetailsPanel(selection = {}) {
@@ -1962,6 +1997,9 @@ function addChoroplethLegendControl() {
       refreshChoroplethRendering();
     });
   });
+
+  // initialize opacity controls after legend is added (or immediately)
+  initializeOpacityControls();
 
   L.DomEvent.disableClickPropagation(container);
   L.DomEvent.disableScrollPropagation(container);

@@ -82,70 +82,185 @@ a {
   position: fixed;
   inset: 0;
   z-index: -2;
-  background: #071114;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 78% 16%, rgba(37, 103, 177, 0.17), transparent 25%),
+    radial-gradient(circle at 22% 80%, rgba(14, 54, 108, 0.2), transparent 31%),
+    #020915;
+}
+
+.background-slideshow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(187, 225, 255, 0.75) 0 1px, transparent 1.5px);
+  background-size: 79px 79px;
+  opacity: 0.34;
+  animation: starsDrift 70s linear infinite;
+}
+
+.background-slideshow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(1, 7, 18, 0.58), transparent 45%, rgba(1, 7, 18, 0.35));
+}
+
+.earth {
+  position: absolute;
+  width: min(90vw, 1040px);
+  aspect-ratio: 1;
+  top: 50%;
+  left: 52%;
+  z-index: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -48%);
+  pointer-events: none;
+  filter: drop-shadow(0 0 38px rgba(44, 138, 255, 0.42));
+  animation: earthFloat 12s ease-in-out infinite;
+}
+
+.earth svg { width: 100%; height: 100%; overflow: visible; }
+.earth-halo { fill: none; stroke: rgba(100, 190, 255, 0.32); stroke-width: 13; filter: url(#earth-glow); }
+.earth-ocean { fill: url(#earth-ocean); }
+.earth-grid { fill: none; stroke: rgba(166, 224, 255, 0.2); stroke-width: 2; }
+.earth-land { fill: rgba(87, 160, 110, 0.58); stroke: rgba(166, 234, 170, 0.33); stroke-width: 3; filter: drop-shadow(0 0 7px rgba(92, 231, 160, 0.38)); animation: continentDrift 38s ease-in-out infinite alternate; }
+.earth-rim { fill: none; stroke: rgba(135, 207, 255, 0.48); stroke-width: 3; }
+.earth-shade { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 30% 26%, transparent 0 33%, rgba(2, 12, 31, 0.18) 57%, rgba(0, 3, 11, 0.82) 100%); }
+
+.globe-network {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.network-arc,
+.network-node {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+.network-arc {
+  border: 2px dashed rgba(154, 227, 255, 0.68);
+  border-radius: 999px;
+  opacity: 0.84;
+}
+
+.arc-1 {
+  width: 74%;
+  height: 70%;
+  top: 14%;
+  left: 13%;
+  transform: rotate(-18deg);
+  animation: arcDrift 38s linear infinite;
+}
+
+.arc-2 {
+  width: 58%;
+  height: 56%;
+  top: 22%;
+  left: 27%;
+  transform: rotate(28deg);
+  animation: arcGlow 29s linear infinite;
+}
+
+.arc-3 {
+  width: 86%;
+  height: 82%;
+  top: 8%;
+  left: 7%;
+  transform: rotate(68deg);
+  animation: arcPulse 46s linear infinite;
+}
+
+.arc-4 { width: 94%; height: 48%; top: 26%; left: 3%; transform: rotate(-49deg); animation: arcOrbitFour 33s linear infinite reverse; }
+
+.network-node {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.96), rgba(109, 227, 255, 0.55));
+  box-shadow: 0 0 24px rgba(104, 217, 255, 0.42);
+}
+
+.node-1 {
+  top: 20%;
+  left: 42%;
+  animation: nodePulse 3.8s ease-in-out infinite;
+}
+
+.node-2 {
+  top: 34%;
+  left: 62%;
+  animation: nodePulse 4.4s ease-in-out 0.8s infinite;
+}
+
+.node-3 {
+  top: 56%;
+  left: 30%;
+  animation: nodePulse 5.2s ease-in-out 1.6s infinite;
 }
 
 .slide {
-  position: absolute;
-  inset: 0;
-  background-position: center;
-  background-size: cover;
-  opacity: 0;
-  transform: scale(1.04);
-  animation: backgroundFade 36s infinite;
+  display: none !important;
 }
 
-.slide-1 {
-  background-image: url("https://commons.wikimedia.org/wiki/Special:Redirect/file/2023_Elections_in_Nigeria_14.jpg?width=1920");
-}
+@keyframes earthFloat { 0%, 100% { transform: translate(-50%, -48%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.025); } }
+@keyframes continentDrift { from { transform: translateX(-10px); } to { transform: translateX(12px); } }
+@keyframes starsDrift { from { background-position: 0 0; } to { background-position: 79px 158px; } }
 
-.slide-2 {
-  background-image: url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Area_shot_of_polling_units.jpg?width=1920");
-  animation-delay: 6s;
-}
-
-.slide-3 {
-  background-image: url("https://commons.wikimedia.org/wiki/Special:Redirect/file/2023_Elections_in_Nigeria_24.jpg?width=1920");
-  animation-delay: 12s;
-}
-
-.slide-4 {
-  background-image: url("https://commons.wikimedia.org/wiki/Special:Redirect/file/2023_Elections_in_Nigeria_19.jpg?width=1920");
-  animation-delay: 18s;
-}
-
-.slide-5 {
-  background-image: url("https://commons.wikimedia.org/wiki/Special:Redirect/file/2023_Elections_in_Nigeria_11.jpg?width=1920");
-  animation-delay: 24s;
-}
-
-.slide-6 {
-  background-image: url("https://commons.wikimedia.org/wiki/Special:Redirect/file/2011_Nigerian_presidential_election1.JPG?width=1600");
-  animation-delay: 30s;
-}
-
-@keyframes backgroundFade {
-  0% {
-    opacity: 0;
-    transform: scale(1.04);
+@keyframes arcDrift {
+  from {
+    transform: rotate(-18deg) scale(1);
   }
+  50% {
+    transform: rotate(-18deg) scale(1.01);
+  }
+  to {
+    transform: rotate(-18deg) scale(1);
+  }
+}
 
-  5% {
+@keyframes arcGlow {
+  from {
+    opacity: 0.78;
+  }
+  50% {
+    opacity: 0.95;
+  }
+  to {
+    opacity: 0.78;
+  }
+}
+
+@keyframes arcPulse {
+  from {
+    transform: rotate(68deg) scale(1);
+  }
+  50% {
+    transform: rotate(68deg) scale(1.02);
+  }
+  to {
+    transform: rotate(68deg) scale(1);
+  }
+}
+
+@keyframes arcOrbitFour {
+  from, to { transform: rotate(-49deg) scale(1); }
+  50% { transform: rotate(-49deg) scale(1.025); }
+}
+
+@keyframes nodePulse {
+  0%, 100% {
+    transform: scale(1);
     opacity: 1;
   }
-
-  17% {
-    opacity: 1;
-  }
-
-  24% {
-    opacity: 0;
-    transform: scale(1.12);
-  }
-
-  100% {
-    opacity: 0;
-    transform: scale(1.12);
+  50% {
+    transform: scale(1.18);
+    opacity: 0.7;
   }
 }
 
@@ -233,6 +348,7 @@ a {
   display: grid;
   gap: 42px;
 }
+.strong.A1
 
 .hero-copy {
   max-width: 780px;
@@ -515,7 +631,12 @@ h1 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .slide {
+  .slide,
+  .earth,
+  .earth-land,
+  .network-arc,
+  .network-node,
+  .background-slideshow::before {
     animation: none;
   }
 
@@ -608,6 +729,22 @@ h1 {
 .side-nav nav a.active {
   color: #ffffff;
   background: #159763;
+}
+
+/* small styling for the new transparency controls */
+.filter-bar label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.filter-bar input[type="range"] {
+  width: 100%;
+}
+
+.filter-bar output {
+  font-weight: 700;
+  color: var(--muted);
 }
 
 .dashboard-main {
@@ -767,8 +904,31 @@ h1 {
   --stat-soft: rgba(248, 113, 113, 0.12);
 }
 
+/* Make Area Analytics stat cards monochrome (black & white) */
+.insight-scroll .stats-footer .stat-card {
+  --stat-accent: #0b0b0b !important;
+  --stat-soft: rgba(0, 0, 0, 0.04) !important;
+  background: #ffffff !important;
+  border: 1px solid transparent !important;
+  color: #0b0b0b !important;
+}
+
+.insight-scroll .stats-footer .stat-card:hover,
+.insight-scroll .stats-footer .stat-card:focus-within {
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  background: #ffffff !important;
+}
+
 .insight-scroll .stats-footer .stat-card span {
-  color: color-mix(in srgb, var(--stat-accent) 72%, #ffffff);
+  color: #333333 !important;
+}
+
+.insight-scroll .stats-footer .stat-card strong {
+  color: #000000 !important;
+}
+
+.insight-scroll .stats-footer .stat-card span {
+  color: #333333;
   font-size: 0.64rem;
   white-space: normal;
 }
@@ -1079,6 +1239,61 @@ h1 {
   gap: 8px;
 }
 
+
+.dashboard-page.population-page .side-nav nav a:hover,
+.dashboard-page.population-page .side-nav nav a.active {
+  color: #ffffff;
+  background: #159763;
+}
+
+.dashboard-page.population-page .filter-bar button {
+  background: #159763;
+  border-color: rgba(21, 151, 99, 0.24);
+}
+
+.dashboard-page.population-page .filter-bar .secondary-button {
+  color: #24333a;
+  background: #ffffff;
+  border-color: #d8e1df;
+}
+
+.dashboard-page.population-page .filter-bar .custom-select-button,
+.dashboard-page.population-page .filter-bar select,
+.dashboard-page.population-page .filter-bar input {
+  color: #1b2b31;
+  background: #ffffff;
+  border-color: #d8e1df;
+}
+
+.dashboard-page.population-page .filter-bar .custom-select-menu,
+.dashboard-page.population-page .filter-bar .custom-select-option {
+  background: #ffffff;
+  color: #0f252c;
+}
+
+.dashboard-page.population-page .filter-bar .custom-select-option:hover,
+.dashboard-page.population-page .filter-bar .custom-select-option:focus-visible,
+.dashboard-page.population-page .filter-bar .custom-select-option.is-selected {
+  color: #0f252c;
+  background: #ffffff;
+}
+
+.dashboard-page.population-page .filter-bar .custom-select-option:hover,
+.dashboard-page.population-page .filter-bar .custom-select-option:focus-visible {
+  outline: none;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dashboard-page.population-page #collectedPVCValue,
+.dashboard-page.population-page #collectedLegend {
+  color: #159763;
+}
+
+.dashboard-page.population-page .insight-scroll .stats-footer .stat-card {
+  --stat-accent: #159763;
+  --stat-soft: rgba(21, 151, 99, 0.10);
+}
+
 .map-panel {
   position: relative;
   min-height: 0;
@@ -1091,7 +1306,7 @@ h1 {
 #populationMap {
   position: absolute;
   inset: 0;
-  background: #dce9e6;
+  background: #f3f1f7;
 }
 
 .panel-resizer {
@@ -2599,6 +2814,7 @@ h1 {
 .results-main { display:block; max-width:1560px; height:100vh; overflow-x:hidden; overflow-y:auto; padding-bottom:42px; }
 .results-page .dashboard-header h1 { font-size: clamp(1.9rem, 4vw, 3.2rem); }
 .results-map-section { margin:24px 0 24px; padding:20px; border:1px solid rgba(255,255,255,.11); border-radius:18px; background:rgba(14,32,42,.9); box-shadow:0 18px 42px rgba(3,14,22,.18); }.results-map-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; }.results-map-heading h2,.result-details-heading h2 { margin:3px 0 0; font-size:1.35rem; }.results-map-heading .page-kicker,.result-details-heading .page-kicker { margin:0; }.map-heading-actions { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:12px; }.map-heading-actions button { padding:8px 11px; border:1px solid rgba(107,224,176,.45); border-radius:8px; color:#c9ffe5; background:rgba(73,184,139,.12); font-weight:800; cursor:pointer; }.map-heading-actions button:hover { background:rgba(73,184,139,.25); }.results-map-grid { display:grid; grid-template-columns:minmax(0,2fr) minmax(285px,.72fr); min-height:520px; overflow:hidden; border:1px solid rgba(255,255,255,.12); border-radius:14px; }.results-map-grid #electionResultsMap { min-height:520px; z-index:0; }.election-map-legend { display:flex; flex-wrap:wrap; gap:12px; color:#c5dad3; font-size:.78rem; }.election-map-legend span { display:inline-flex; align-items:center; gap:6px; }.election-map-legend i { width:11px; height:11px; border-radius:50%; }.election-complete-dot { background:#25a96d; }.election-pending-dot { background:#9baeb7; }.state-map-details { display:flex; flex-direction:column; justify-content:center; padding:28px; background:linear-gradient(160deg,#123c49,#102735); color:#d9ece6; }.state-map-details .page-kicker { margin:0; }.state-map-details h3 { margin:7px 0 12px; color:#fff; font-size:clamp(1.25rem,2vw,1.6rem); line-height:1.25; }.state-map-details p { color:#b8d4cb; line-height:1.6; }.state-status { align-self:flex-start; display:inline-block; padding:5px 8px; border-radius:999px; font-size:.72rem; font-weight:800; }.state-status.completed { color:#c9ffe5; background:rgba(40,194,122,.22); }.state-status.pending { color:#e5edf0; background:rgba(153,174,183,.24); }.state-map-details button { width:100%; margin-top:12px; padding:11px; border:0; border-radius:8px; color:#06231c; background:#6be0b0; font-weight:800; cursor:pointer; }.result-details-heading { margin:2px 0 12px; }
+.state-history { display:grid; gap:8px; margin:16px 0 0; }.state-history h4 { margin:0 0 2px; color:#fff; font-size:.86rem; }.history-result { width:100%; padding:10px; border:1px solid rgba(255,255,255,.13); border-radius:9px; background:rgba(255,255,255,.06); color:#eaf7f2; text-align:left; cursor:pointer; }.history-result:hover,.history-result:focus-visible { background:rgba(107,224,176,.17); outline:none; }.history-result strong,.history-result span { display:block; }.history-result strong { font-size:.8rem; }.history-result span { margin-top:3px; color:#b8d4cb; font-size:.74rem; }
 .results-source-card, .results-panel, .winner-card, .results-stat-grid article {
   border: 1px solid rgba(255,255,255,.11); border-radius: 16px; background: rgba(14, 32, 42, .9);
 }

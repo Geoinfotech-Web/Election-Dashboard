@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nigeria Election GIS Dashboard</title>
+    <title>Geospatial Intelligence Election Dashboard</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -15,14 +15,60 @@
         <div class="slide slide-4"></div>
         <div class="slide slide-5"></div>
         <div class="slide slide-6"></div>
+        <div class="earth" aria-hidden="true">
+          <svg viewBox="0 0 1000 1000" role="presentation">
+            <defs>
+              <radialGradient id="earth-ocean" cx="35%" cy="28%" r="72%">
+                <stop offset="0%" stop-color="#4d9cdd" />
+                <stop offset="43%" stop-color="#164e88" />
+                <stop offset="76%" stop-color="#08284c" />
+                <stop offset="100%" stop-color="#020c1e" />
+              </radialGradient>
+              <filter id="earth-glow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="15" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+              <clipPath id="earth-clip"><circle cx="500" cy="500" r="462" /></clipPath>
+            </defs>
+            <circle class="earth-halo" cx="500" cy="500" r="468" />
+            <circle class="earth-ocean" cx="500" cy="500" r="462" />
+            <g class="earth-grid" clip-path="url(#earth-clip)">
+              <ellipse cx="500" cy="500" rx="458" ry="120" />
+              <ellipse cx="500" cy="500" rx="458" ry="245" />
+              <ellipse cx="500" cy="500" rx="458" ry="365" />
+              <ellipse cx="500" cy="500" rx="160" ry="462" />
+              <ellipse cx="500" cy="500" rx="310" ry="462" />
+              <path d="M500 38 C320 245 320 755 500 962 C680 755 680 245 500 38" />
+            </g>
+            <g class="earth-land" clip-path="url(#earth-clip)">
+              <path d="M240 197l86-65 93 17 39 64-27 47 49 50-35 71-79-9-40 70-75-18-51-90 14-80z" />
+              <path d="M449 290l70-29 58 36 44-6 55 43-19 60-66 8-21 57-55-13-54-66 8-90z" />
+              <path d="M518 467l74 22 46 78-27 69 25 86-57 122-55-42 9-107-46-79 19-81-30-49 42-19z" />
+              <path d="M637 166l111 18 71 64-4 61-71 11-46-52-80-21-18-46 37-35z" />
+              <path d="M744 388l96-26 83 61-31 85-61 17-34-43-72-19 19-75z" />
+              <path d="M231 521l80 18 23 65-38 61 13 97-55 44-44-88 7-93-39-48 53-56z" />
+            </g>
+            <circle class="earth-rim" cx="500" cy="500" r="462" />
+          </svg>
+          <span class="earth-shade"></span>
+        </div>
+        <div class="globe-network" aria-hidden="true">
+          <span class="network-arc arc-1"></span>
+          <span class="network-arc arc-2"></span>
+          <span class="network-arc arc-3"></span>
+          <span class="network-arc arc-4"></span>
+          <span class="network-node node-1"></span>
+          <span class="network-node node-2"></span>
+          <span class="network-node node-3"></span>
+        </div>
       </div>
 
       <header class="topbar" aria-label="Dashboard navigation">
-        <a class="brand" href="index.html" aria-label="Nigeria Election GIS Dashboard home">
+        <a class="brand" href="index.html" aria-label="Geospatial Intelligence Election Dashboard home">
           <img src="assets/geoinfotech-logo.jpeg" alt="GEOINFOTECH logo" />
           <span>
-            <strong>Nigeria</strong>
-            <strong>Geospatial Election Intelligence Dashboard</strong>
+            <strong>Geospatial Intelligence</strong>
+            <strong>Election Dashboard</strong>
           </span>
         </a>
 
@@ -38,10 +84,10 @@
       <section class="hero" aria-labelledby="home-title">
         <div class="hero-copy">
           <p class="eyebrow">Welcome to the</p>
-          <h1 id="home-title">Nigeria Election GIS Dashboard</h1>
+          <h1 id="home-title">Geospatial Intelligence Election Dashboard</h1>
           <p class="intro">
-            Interactive geospatial intelligence for electoral analysis, polling unit
-            accessibility, population patterns, and verified election results across Nigeria.
+            Interactive Global Geospatial Intelligence For Electoral Analysis, Polling Unit
+            Accessibility, Population Patterns, and Verified Election Results Worldwide.
           </p>
         </div>
 
@@ -72,7 +118,7 @@
         </div>
       </section>
 
-      <section class="metrics" aria-label="National election coverage summary">
+      <!-- <section class="metrics" aria-label="National election coverage summary">
         <div>
           <strong>36</strong>
           <span>States + FCT</span>
@@ -97,4 +143,4 @@
   
     </main>
   </body>
-</html>
+</html> -->

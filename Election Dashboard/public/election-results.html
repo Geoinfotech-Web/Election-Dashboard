@@ -22,7 +22,7 @@
       <section class="results-source-card">
         <span class="live-dot"></span>
         <strong>Live news connected</strong>
-        <p>Live headlines come from BBC News Africa and GDELT, with verified result reports available below.</p>
+        <p>Live headlines use NewsAPI when configured, with BBC News Africa and GDELT as fallbacks. Select a state to view its archive.</p>
         <button id="refreshResultsButton" type="button">Refresh results</button>
       </section>
     </aside>
@@ -39,8 +39,8 @@
 
       <section class="results-map-section" aria-labelledby="electionMapHeading">
         <div class="results-map-heading">
-          <div><p class="page-kicker">Map layers</p><h2 id="electionMapHeading">Election status by state</h2></div>
-          <div class="map-heading-actions"><div class="election-map-legend" aria-label="Map legend"><span><i class="election-complete-dot"></i> Election completed</span><span><i class="election-pending-dot"></i> Not yet held</span></div><button id="resetElectionMap" type="button">View all states</button></div>
+          <div><p class="page-kicker">Map layers</p><h2 id="electionMapHeading">Election results and history by state</h2></div>
+          <div class="map-heading-actions"><div class="election-map-legend" aria-label="Map legend"><span><i class="election-complete-dot"></i> Result archive available</span><span><i class="election-pending-dot"></i> News lookup available</span></div><button id="resetElectionMap" type="button">View all states</button></div>
         </div>
         <div class="results-map-grid">
           <div id="electionResultsMap" aria-label="Nigeria election status map"></div>
