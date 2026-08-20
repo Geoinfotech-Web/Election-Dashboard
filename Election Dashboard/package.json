@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
+    "inec:ingest": "node inec-ingest.js",
     "analyze:wards": "python scripts/ward_pu_analysis.py",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -14,6 +15,7 @@
   "type": "commonjs",
   "dependencies": {
     "chart.js": "^4.5.1",
+    "cheerio": "^1.2.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -23,6 +25,7 @@
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "papaparse": "^5.5.3",
+    "pdf-parse": "^2.4.5",
     "shpjs": "^6.2.0",
     "xlsx": "^0.18.5"
   }
