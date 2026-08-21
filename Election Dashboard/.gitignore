@@ -20,3 +20,8 @@ server.autostart.*.log
 
 # large binary/data
 NGA_adm.zip
+<<<<<<< HEAD
+=======
+Design system form submission.zip
+data/inec/*.html
+>>>>>>> e258d0f0ca141b06dab124b0e4367db71891a385

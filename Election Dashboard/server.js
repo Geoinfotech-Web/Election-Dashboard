@@ -17,6 +17,8 @@ disableProxyForGoogleAuth();
 const { google } = require('googleapis');
 const { getFileMetadata, listFilesInFolderTree, searchFiles, readFile, readPopulationData } = require('./drive');
 const { buildPollingUnitDashboardData, normalizeLookupKey } = require('./polling-data');
+const { runIngest, loadLatestSnapshot, getIngestStatus, hydrateIngestStatus } = require('./inec-ingest');
+const { computeNigeriaKpis } = require('./nigeria-kpis');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -351,7 +353,8 @@ function normalizePollingUnitPointRow(row) {
       row.polling_unit_name ||
       row.name
   );
-  const sourceName = toDisplayCase(getFieldValue(row, ['location', 'name']) || row.location || row.name);
+  const sourceName = String(getFieldValue(row, ['location', 'name']) || row.location || row.name || '').trim();
+  const address = String(getFieldValue(row, ['location']) || row.location || '').trim();
 
   const latitudeCandidates = [
     'lat',
@@ -401,6 +404,7 @@ function normalizePollingUnitPointRow(row) {
       getFieldValue(row, ['pu_code', 'polling_unit_code', 'pollingunitcode', 'code']) || ''
     ).trim(),
     name: sourceName,
+    address,
     addressQuery: buildPollingUnitAddressQuery({ name: sourceName, ward, lga, state }),
   };
 }
@@ -436,6 +440,9 @@ function isPointInsideBBox(point, bbox) {
 }
 
 let pollingUnitPointsCache = null;
+let localPollingPointsCache = null;
+let pollingTreeCache = null;
+let pollingTreePromise = null;
 
 async function loadLocalPollingUnitCoordinateOverrides() {
   try {
@@ -479,6 +486,7 @@ async function loadLocalPollingUnitCoordinateOverrides() {
 }
 
 async function loadLocalPollingUnitPoints() {
+  if (localPollingPointsCache) return localPollingPointsCache;
   const csvText = await fs.readFile(LOCAL_POLLING_UNIT_DATA_PATH, 'utf8');
   const parsed = Papa.parse(csvText, {
     header: true,
@@ -490,9 +498,10 @@ async function loadLocalPollingUnitPoints() {
     console.warn('Local polling unit CSV parsed with warnings:', parsed.errors[0]);
   }
 
-  return (parsed.data || [])
+  localPollingPointsCache = (parsed.data || [])
     .map((row) => normalizePollingUnitPointRow(row))
     .filter((point) => point.state && point.lga && point.code);
+  return localPollingPointsCache;
 }
 
 async function loadLocalPollingUnitPointsForArea({ state, lga } = {}) {
@@ -711,28 +720,63 @@ async function loadPollingUnitPointsForArea({ state, lga } = {}) {
   return resolvePollingUnitCoordinates(areaPoints);
 }
 
-function buildPollingUnitPointResponse(points, { state, lga, bbox } = {}) {
+function pickNormalizedKey(obj, name) {
+  if (!obj || !name) return null;
+  if (Object.prototype.hasOwnProperty.call(obj, name)) return name;
+  const key = normalizeLookupKey(name);
+  return Object.keys(obj).find((item) => normalizeLookupKey(item) === key) || null;
+}
+
+async function getPollingTree() {
+  if (pollingTreeCache) return pollingTreeCache;
+  if (!pollingTreePromise) {
+    pollingTreePromise = (async () => {
+      const points = await loadLocalPollingUnitPoints();
+      const tree = {};
+      for (const point of points) {
+        if (!point.state || !point.lga) continue;
+        if (!tree[point.state]) tree[point.state] = {};
+        if (!tree[point.state][point.lga]) tree[point.state][point.lga] = {};
+        if (point.ward) tree[point.state][point.lga][point.ward] = true;
+      }
+      pollingTreeCache = tree;
+      return tree;
+    })();
+  }
+  return pollingTreePromise;
+}
+
+function buildPollingUnitPointResponse(points, { state, lga, ward, q, bbox, limit } = {}) {
   const stateKey = normalizeLookupKey(state);
   const lgaKey = normalizeLookupKey(lga);
-  const filteredPoints = points.filter((point) => {
-    if (stateKey && normalizeLookupKey(point.state) !== stateKey) {
-      return false;
+  const wardKey = normalizeLookupKey(ward);
+  const queryKey = normalizeLookupKey(q);
+  const max = Number(limit) > 0 ? Number(limit) : 0;
+  const filteredPoints = [];
+
+  for (const point of points) {
+    if (stateKey && normalizeLookupKey(point.state) !== stateKey) continue;
+    if (lgaKey && normalizeLookupKey(point.lga) !== lgaKey) continue;
+    if (wardKey && normalizeLookupKey(point.ward) !== wardKey) continue;
+    if (!isPointInsideBBox(point, bbox)) continue;
+    if (queryKey) {
+      const hay = normalizeLookupKey(
+        [point.pollingUnit, point.name, point.ward, point.lga, point.state, point.code].join(' ')
+      );
+      if (!hay.includes(queryKey)) continue;
     }
+    filteredPoints.push({
+      ...point,
+      state: point.state || '',
+      lga: point.lga || '',
+      ward: point.ward || '',
+      pollingUnit: point.pollingUnit || '',
+      address: point.address || point.name || '',
+    });
+    if (max && filteredPoints.length >= max) break;
+  }
 
-    if (lgaKey && normalizeLookupKey(point.lga) !== lgaKey) {
-      return false;
-    }
-
-    return isPointInsideBBox(point, bbox);
-  });
-
-  return filteredPoints.map((point) => ({
-    ...point,
-    state: point.state || '',
-    lga: point.lga || '',
-    ward: point.ward || '',
-    pollingUnit: point.pollingUnit || '',
-  }));
+  return filteredPoints;
 }
 
 async function getCredentialsConfig() {
@@ -1224,8 +1268,18 @@ app.get('/api/admin/drive/files', requireAdminApi, async (req, res) => {
   }
 });
 
-app.use('/admin', express.static(path.join(__dirname, 'admin')));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use('/admin', express.static(path.join(__dirname, 'admin'), {
+  setHeaders(res, filePath) {
+    if (/\.(html|js)$/i.test(filePath)) res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  },
+}));
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  lastModified: false,
+  setHeaders(res, filePath) {
+    if (/\.(html|js)$/i.test(filePath)) res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  },
+}));
 
 app.get('/api/drive/search', requireAdminApi, async (req, res) => {
   const { q } = req.query;
@@ -1316,6 +1370,26 @@ app.get('/api/polling-units-data', async (req, res) => {
   }
 });
 
+app.get('/api/polling-directory', async (req, res) => {
+  try {
+    const tree = await getPollingTree();
+    const stateKey = pickNormalizedKey(tree, req.query.state);
+    const payload = { states: Object.keys(tree).sort((a, b) => a.localeCompare(b)) };
+    if (stateKey) {
+      payload.lgas = Object.keys(tree[stateKey]).sort((a, b) => a.localeCompare(b));
+      const lgaKey = pickNormalizedKey(tree[stateKey], req.query.lga);
+      if (lgaKey) {
+        payload.wards = Object.keys(tree[stateKey][lgaKey]).sort((a, b) => a.localeCompare(b));
+      }
+    }
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.json(payload);
+  } catch (error) {
+    console.error('Error handling /api/polling-directory:', error.message || error);
+    return res.status(500).json({ error: 'Failed to load polling unit directory.' });
+  }
+});
+
 const EKITI_2026_RESULT = {
   election: 'Ekiti State Governorship Election 2026',
   state: 'Ekiti',
@@ -1358,9 +1432,26 @@ const EKITI_2026_RESULT = {
   ],
 };
 
+const NIGERIA_2023_PRES = {
+  election: '2023 Presidential Election',
+  state: 'Nigeria',
+  electionDate: '2023-02-25',
+  declaredDate: '2023-03-01',
+  winner: { name: 'Bola Ahmed Tinubu', party: 'APC', votes: 8707945 },
+  candidates: [
+    { name: 'Bola Ahmed Tinubu', party: 'APC', votes: 8707945, share: 36.61 },
+    { name: 'Atiku Abubakar', party: 'PDP', votes: 6989844, share: 29.07 },
+    { name: 'Peter Obi', party: 'LP', votes: 6101549, share: 25.4 },
+    { name: 'Rabiu Kwankwaso', party: 'NNPP', votes: 1496633, share: 6.23 },
+  ],
+  totals: { accreditedVoters: 24894112, validVotes: 24025580, rejectedVotes: 865172, turnout: 26.72 },
+  sources: [{ publisher: 'INEC', title: 'Independent National Electoral Commission', url: 'https://www.inecnigeria.org/' }],
+};
+
 // Archived results are curated election records. Headlines can surface useful
 // coverage, but NewsAPI is not an authoritative vote-count database.
 const ELECTION_RESULT_ARCHIVE = {
+  nigeria: [NIGERIA_2023_PRES],
   ekiti: [
     EKITI_2026_RESULT,
     {
@@ -1511,10 +1602,14 @@ app.get('/api/polling-unit-points', async (req, res) => {
     ]);
 
     const bbox = parseBBox(req.query.bbox);
+    const searchLimit = req.query.q && !bbox ? Number(req.query.limit) || 25 : Number(req.query.limit) || 0;
     const filteredPoints = buildPollingUnitPointResponse(points, {
       state: req.query.state,
       lga: req.query.lga,
+      ward: req.query.ward,
+      q: req.query.q,
       bbox,
+      limit: searchLimit,
     });
 
     const lgaLookup = new Map(
@@ -1566,6 +1661,8 @@ app.get('/api/polling-units.geojson', async (req, res) => {
           geometry: { type: 'Point', coordinates: [point.longitude, point.latitude] },
           properties: {
             name: point.pollingUnit || '',
+            address: point.address || point.name || '',
+            code: point.code || '',
             state: point.state || '',
             lga: point.lga || '',
             ward: point.ward || '',
@@ -1640,6 +1737,126 @@ app.get('/api/drive/read', requireAdminApi, async (req, res) => {
   }
 });
 
+const GRID3_LAYERS = {
+  state: process.env.GRID3_STATE_URL || 'https://services3.arcgis.com/BU6Aadhn6tbBEdyk/arcgis/rest/services/NGA_State_Boundaries_V2/FeatureServer/0',
+  lga: process.env.GRID3_LGA_URL || 'https://services3.arcgis.com/BU6Aadhn6tbBEdyk/arcgis/rest/services/NGA_LGA_Boundaries_2/FeatureServer/0',
+  ward: process.env.GRID3_WARD_URL || 'https://services3.arcgis.com/BU6Aadhn6tbBEdyk/arcgis/rest/services/NGA_Ward_Boundaries/FeatureServer/0',
+  health: process.env.GRID3_HEALTH_URL || 'https://services3.arcgis.com/BU6Aadhn6tbBEdyk/arcgis/rest/services/GRID3_NGA_health_facilities_v2_0/FeatureServer/0',
+};
+
+app.get('/api/grid3-config', (_req, res) => {
+  res.json({
+    source: 'GRID3 Nigeria (CIESIN / NASRDA)',
+    attribution: 'GRID3, CC BY 4.0',
+    layers: Object.fromEntries(Object.entries(GRID3_LAYERS).map(([id, url]) => [id, { url }])),
+  });
+});
+
+app.get('/api/grid3/:layer', async (req, res) => {
+  const layerUrl = GRID3_LAYERS[req.params.layer];
+  if (!layerUrl) {
+    return res.status(404).json({ error: 'Unknown GRID3 layer.' });
+  }
+
+  const bbox = parseBBox(req.query.bbox);
+  const params = new URLSearchParams({
+    f: 'geojson',
+    where: '1=1',
+    outFields: '*',
+    outSR: '4326',
+    returnGeometry: 'true',
+    resultRecordCount: String(Math.min(Number(req.query.max) || 1200, 2000)),
+  });
+
+  if (bbox) {
+    params.set('geometry', `${bbox.west},${bbox.south},${bbox.east},${bbox.north}`);
+    params.set('geometryType', 'esriGeometryEnvelope');
+    params.set('inSR', '4326');
+    params.set('spatialRel', 'esriSpatialRelIntersects');
+    const span = Math.max(bbox.east - bbox.west, bbox.north - bbox.south);
+    if (span > 2) params.set('maxAllowableOffset', String(span / 400));
+  }
+
+  try {
+    const upstream = await fetch(`${layerUrl.replace(/\/$/, '')}/query?${params.toString()}`, {
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!upstream.ok) {
+      return res.status(502).json({ error: 'GRID3 layer request failed.', status: upstream.status });
+    }
+    const payload = await upstream.json();
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.json(payload);
+  } catch (error) {
+    console.error('GRID3 proxy error:', error.message || error);
+    return res.status(502).json({ error: 'Unable to load GRID3 layer.' });
+  }
+});
+
+app.get('/api/nigeria-kpis', async (req, res) => {
+  try {
+    const payload = await computeNigeriaKpis({
+      state: req.query.state,
+      lga: req.query.lga,
+      ward: req.query.ward,
+      pu: req.query.pu,
+    });
+    const ingest = getIngestStatus();
+    res.setHeader('Cache-Control', 'public, max-age=120');
+    return res.json({ ...payload, ingest: { source: ingest.source, lastSuccessAt: ingest.lastSuccessAt } });
+  } catch (error) {
+    console.error('nigeria-kpis error:', error.message || error);
+    return res.status(500).json({ error: 'Failed to compute Nigeria KPIs.' });
+  }
+});
+
+app.get('/api/inec-ingest/status', async (_req, res) => {
+  const status = getIngestStatus();
+  return res.json(status);
+});
+
+app.post('/api/admin/inec-ingest', requireAdminApi, async (_req, res) => {
+  try {
+    const result = await runIngest();
+    return res.json({ ok: true, status: result.status });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message || String(error) });
+  }
+});
+
+app.get('/api/elections', (_req, res) => {
+  const rows = [];
+  for (const [key, list] of Object.entries(ELECTION_RESULT_ARCHIVE)) {
+    for (const item of list || []) {
+      rows.push({
+        key,
+        name: item.election,
+        type: /presidential/i.test(item.election) ? 'Presidential' : 'Gubernatorial',
+        date: (item.electionDate || '').slice(0, 4),
+        detail: item.state,
+        status: 'Result',
+        winner: item.winner,
+      });
+    }
+  }
+  rows.push({
+    key: 'nigeria-2027',
+    name: '2027 General Election',
+    type: 'Presidential',
+    date: '2027',
+    detail: 'Nigeria · scheduled',
+    status: 'Upcoming',
+    winner: null,
+  });
+  return res.json({ elections: rows });
+});
+
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
+  hydrateIngestStatus().catch(() => {});
+  runIngest().catch((error) => console.warn('Startup INEC ingest skipped:', error.message || error));
+  const sixHours = 6 * 60 * 60 * 1000;
+  setInterval(() => {
+    runIngest().catch((error) => console.warn('Scheduled INEC ingest failed:', error.message || error));
+  }, sixHours);
 });
