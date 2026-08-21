@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Explore worldwide election intelligence by country, election, and status." />
+    <title>Explore Elections | GEOINTEL</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="gateway-page theme-dark">
+    <a class="landing-skip-link" href="#gateway-main">Skip to election explorer</a>
+
+    <header class="gateway-header">
+      <div class="gateway-header-left">
+        <a class="gateway-back-home" href="index.html" aria-label="Back to home">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+          <span>Back home</span>
+        </a>
+        <a class="gateway-brand" href="index.html" aria-label="GEOINTEL home">
+          <span class="gateway-brand-mark"><img src="assets/geointel-election-logo.png" alt="" /></span>
+          <span><strong>GEOINTEL</strong><small>Election intelligence</small></span>
+        </a>
+      </div>
+      <div class="gateway-header-actions">
+        <button class="gateway-theme-toggle" type="button" data-gateway-theme aria-label="Switch to light mode">
+          <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="gateway-main" class="gateway-main">
+      <section class="gateway-intro" aria-labelledby="gateway-title">
+        <h1 id="gateway-title">Explore elections through<br /> <em>data, geography and time.</em></h1>
+        <p>Select a country to open its election intelligence, or enter the global dashboard to explore available election information in one place.</p>
+
+        <div class="gateway-primary-actions">
+          <a class="gateway-open-button" href="dashboard.html?country=NG">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"></path></svg>
+            Open global dashboard
+            <span>→</span>
+          </a>
+          <label class="gateway-search" for="gateway-search-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+            <input id="gateway-search-input" type="search" autocomplete="off" placeholder="Search a country or election…" />
+            <kbd>/</kbd>
+          </label>
+        </div>
+        <p class="gateway-data-note"><span>i</span> Election status cards below are interface preview data until verified live sources are connected.</p>
+      </section>
+
+      <section class="gateway-explorer" aria-labelledby="country-explorer-title">
+        <div class="gateway-section-heading">
+          <div class="gateway-country-heading">
+            <p>Select a country</p>
+            <h2 id="country-explorer-title" class="sr-only">Election intelligence by geography</h2>
+          </div>
+          <div class="gateway-status-filters" role="group" aria-label="Filter countries by election status">
+            <button class="is-active" type="button" data-status-filter="all" aria-pressed="true">All <span data-filter-count="all">0</span></button>
+            <button type="button" data-status-filter="live" aria-pressed="false"><i class="status-live"></i> Live <span data-filter-count="live">0</span></button>
+            <button type="button" data-status-filter="upcoming" aria-pressed="false"><i class="status-upcoming"></i> Upcoming <span data-filter-count="upcoming">0</span></button>
+            <button type="button" data-status-filter="recent" aria-pressed="false"><i class="status-recent"></i> Recent <span data-filter-count="recent">0</span></button>
+          </div>
+        </div>
+
+        <div id="gateway-results-summary" class="gateway-results-summary" aria-live="polite"></div>
+        <div id="gateway-country-grid" class="gateway-country-grid"></div>
+        <div id="gateway-empty" class="gateway-empty" hidden>
+          <span>⌕</span>
+          <h3>No matching election intelligence</h3>
+          <p>Try a different country, election type, region, or status.</p>
+          <button type="button" data-clear-search>Clear search</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="gateway.js"></script>
+  </body>
+</html>

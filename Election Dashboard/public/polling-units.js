@@ -232,6 +232,10 @@ function setSearchMessage(msg) { searchMessage.textContent = msg; }
 
 function showPollingGuide() {
   if (!pollingGuideModal) return;
+  if (new URLSearchParams(window.location.search).get('preview') === 'tv') {
+    pollingGuideModal.classList.add('is-hidden');
+    return;
+  }
   const dismissed = localStorage.getItem('pollingGuideDismissed') === 'true';
   if (dismissed) {
     pollingGuideModal.classList.add('is-hidden');

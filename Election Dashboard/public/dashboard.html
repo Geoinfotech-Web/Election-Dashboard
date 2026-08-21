@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Nigeria election geointelligence dashboard for elections, population, candidates, parties, analysis, and data." />
+    <title>Nigeria Election Intelligence | GEOINTEL</title>
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="intel-page theme-dark">
+    <a class="landing-skip-link" href="#intel-content">Skip to dashboard content</a>
+    <div class="intel-shell">
+      <header class="intel-topbar">
+        <div class="intel-topbar-left">
+          <a class="intel-back" href="gateway.html" aria-label="Back to election gateway">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+          </a>
+          <a class="intel-brand" href="index.html" aria-label="GEOINTEL home">
+            <span><img src="assets/geointel-election-logo.png" alt="" /></span>
+            <strong>GEOINTEL<small>Election intelligence</small></strong>
+          </a>
+          <div class="intel-scope-title"><span>Nigeria</span><b>National election workspace</b></div>
+        </div>
+        <nav class="intel-navigation" aria-label="Main dashboard sections">
+          <p>Workspace</p>
+          <button class="is-active" type="button" data-intel-section="overview"><span>⌂</span>Overview</button>
+          <button type="button" data-intel-section="population"><span>◉</span>Population &amp; demographics</button>
+          <button type="button" data-intel-section="elections"><span>◇</span>Elections</button>
+          <button type="button" data-intel-section="results"><span>▥</span>Results</button>
+          <button type="button" data-intel-section="candidates"><span>♙</span>Candidates</button>
+          <button type="button" data-intel-section="parties"><span>◫</span>Parties</button>
+          <button type="button" data-intel-section="analysis"><span>⌁</span>Analysis</button>
+          <button type="button" data-intel-section="data"><span>▤</span>Data</button>
+          <a href="polling-units.html"><span>⌖</span>Polling units</a>
+          <a href="population.html"><span>↗</span>Full population tool</a>
+        </nav>
+        <div class="intel-topbar-actions">
+          <span class="intel-source-status"><i></i> Local datasets connected</span>
+          <button class="intel-theme-toggle" type="button" data-intel-theme aria-label="Switch to light mode">
+            <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+            <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z"></path></svg>
+          </button>
+        </div>
+      </header>
+
+      <aside class="intel-sidebar">
+        <div class="intel-sidebar-bottom">
+          <a class="intel-admin-link" href="admin.html"><span>▣</span><div><b>Administration</b><small>Restricted access</small></div><i>›</i></a>
+          <div class="intel-country-chip"><img src="assets/flags/ng.png" alt="Nigeria flag" /><span><b>Nigeria</b><small>Current country</small></span></div>
+        </div>
+      </aside>
+
+      <main id="intel-content" class="intel-content">
+        <div id="intel-country-notice" class="intel-country-notice" hidden></div>
+        <header class="intel-page-header">
+          <div>
+            <p id="intel-kicker">Nigeria · National overview</p>
+            <h1 id="intel-page-title">Election intelligence</h1>
+            <span id="intel-page-description">A source-aware view of electoral geography, participation, population, and available results.</span>
+          </div>
+          <div class="intel-header-links">
+            <a href="gateway.html">Change country</a>
+            <button class="intel-mobile-nav-toggle" type="button" data-intel-mobile-nav aria-label="Open dashboard navigation">Menu</button>
+          </div>
+        </header>
+
+        <section class="intel-filterbar" aria-label="Dashboard filters">
+          <label><span>Country</span><select id="intel-country-filter"><option value="NG">Nigeria</option></select></label>
+          <label><span>State</span><select id="intel-state-filter"><option value="all">All states &amp; FCT</option></select></label>
+          <label><span>Year</span><select id="intel-year-filter"><option value="all">All available years</option><option>2026</option><option>2023</option><option>2022</option><option>2019</option></select></label>
+          <label><span>Election type</span><select id="intel-type-filter"><option value="all">All election types</option><option>Presidential</option><option>Governorship</option><option>Legislative</option><option>Local</option></select></label>
+          <label><span>Status</span><select id="intel-status-filter"><option value="all">All statuses</option><option value="live">Live</option><option value="upcoming">Upcoming</option><option value="completed">Completed</option></select></label>
+          <button id="intel-reset-filters" type="button">Reset</button>
+        </section>
+
+        <section class="intel-view is-active" data-intel-view="overview">
+          <div id="intel-kpi-grid" class="intel-kpi-grid" aria-label="Nigeria election summary"></div>
+          <div class="intel-overview-grid">
+            <article class="intel-panel intel-map-panel">
+              <header class="intel-panel-header">
+                <div><p>Geographic drill-down</p><h2>Nigeria election map</h2></div>
+                <div class="intel-map-actions"><span id="intel-map-breadcrumb">Nigeria / All states</span><button id="intel-reset-map" type="button">Reset map</button></div>
+              </header>
+              <div class="intel-map-stage">
+                <div id="intel-election-map" aria-label="Interactive map of Nigeria states"></div>
+                <div class="intel-map-legend"><strong>Population</strong><span><i class="scale-one"></i>Lower</span><span><i class="scale-two"></i>Medium</span><span><i class="scale-three"></i>Higher</span></div>
+                <div id="intel-map-selection" class="intel-map-selection"><p>Selected geography</p><strong>Nigeria</strong><span>Choose a state on the map to drill down.</span></div>
+              </div>
+            </article>
+            <aside class="intel-activity-rail">
+              <section class="intel-panel intel-activity-card"><header><span class="intel-live-dot"></span><h2>Live elections</h2></header><div id="intel-live-list"></div></section>
+              <section class="intel-panel intel-activity-card"><header><span class="intel-upcoming-dot"></span><h2>Upcoming</h2></header><div id="intel-upcoming-list"></div></section>
+              <section class="intel-panel intel-activity-card"><header><span class="intel-recent-dot"></span><h2>Recent results</h2></header><div id="intel-recent-list"></div></section>
+            </aside>
+          </div>
+        </section>
+
+        <section class="intel-view" data-intel-view="population">
+          <div id="intel-population-kpis" class="intel-kpi-grid"></div>
+          <article class="intel-panel intel-population-workspace">
+            <header class="intel-panel-header">
+              <div><p>Interactive population workspace</p><h2>Population, voters, PVCs and administrative boundaries</h2></div>
+              <a href="population.html" target="_blank" rel="noopener noreferrer">Open full screen ↗</a>
+            </header>
+            <div class="intel-population-frame-wrap">
+              <iframe id="intel-population-frame" src="population.html?embedded=intel" title="Interactive Nigeria population and demographics map"></iframe>
+            </div>
+          </article>
+        </section>
+
+        <section class="intel-view" data-intel-view="elections">
+          <article class="intel-panel intel-section-panel"><header class="intel-panel-header"><div><p>Election archive</p><h2>Available Nigeria elections</h2></div></header><div id="intel-election-list" class="intel-election-list"></div></article>
+        </section>
+
+        <section class="intel-view" data-intel-view="results">
+          <div id="intel-result-summary"></div>
+          <div class="intel-two-column intel-results-layout"><article class="intel-panel"><header class="intel-panel-header"><div><p>Candidate performance</p><h2>Vote totals</h2></div></header><div id="intel-result-bars" class="intel-bar-list"></div></article><article class="intel-panel"><header class="intel-panel-header"><div><p>Verification</p><h2>Result sources</h2></div></header><div id="intel-result-sources" class="intel-source-list"></div></article></div>
+        </section>
+
+        <section class="intel-view" data-intel-view="candidates"><div id="intel-candidate-grid" class="intel-card-grid"></div></section>
+        <section class="intel-view" data-intel-view="parties"><div id="intel-party-grid" class="intel-card-grid"></div></section>
+
+        <section class="intel-view" data-intel-view="analysis">
+          <div id="intel-analysis-kpis" class="intel-kpi-grid"></div>
+          <div class="intel-two-column"><article class="intel-panel"><header class="intel-panel-header"><div><p>Participation</p><h2>Ballot accounting</h2></div></header><div id="intel-analysis-bars" class="intel-bar-list"></div></article><article class="intel-panel"><header class="intel-panel-header"><div><p>Population context</p><h2>Highest PVC collection rates</h2></div></header><div id="intel-pvc-bars" class="intel-bar-list"></div></article></div>
+        </section>
+
+        <section class="intel-view" data-intel-view="data">
+          <div id="intel-data-grid" class="intel-data-grid"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/shpjs/shp.min.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

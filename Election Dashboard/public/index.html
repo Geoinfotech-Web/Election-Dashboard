@@ -3,144 +3,218 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Geospatial Intelligence Election Dashboard</title>
+    <meta name="description" content="A global geospatial election intelligence platform for exploring population, polling access, and election results." />
+    <title>GEOINTEL Election Webapp</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
-    <main class="home-shell">
-      <div class="background-slideshow" aria-hidden="true">
-        <div class="slide slide-1"></div>
-        <div class="slide slide-2"></div>
-        <div class="slide slide-3"></div>
-        <div class="slide slide-4"></div>
-        <div class="slide slide-5"></div>
-        <div class="slide slide-6"></div>
-        <div class="earth" aria-hidden="true">
-          <svg viewBox="0 0 1000 1000" role="presentation">
-            <defs>
-              <radialGradient id="earth-ocean" cx="35%" cy="28%" r="72%">
-                <stop offset="0%" stop-color="#4d9cdd" />
-                <stop offset="43%" stop-color="#164e88" />
-                <stop offset="76%" stop-color="#08284c" />
-                <stop offset="100%" stop-color="#020c1e" />
-              </radialGradient>
-              <filter id="earth-glow" x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur stdDeviation="15" result="blur" />
-                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-              </filter>
-              <clipPath id="earth-clip"><circle cx="500" cy="500" r="462" /></clipPath>
-            </defs>
-            <circle class="earth-halo" cx="500" cy="500" r="468" />
-            <circle class="earth-ocean" cx="500" cy="500" r="462" />
-            <g class="earth-grid" clip-path="url(#earth-clip)">
-              <ellipse cx="500" cy="500" rx="458" ry="120" />
-              <ellipse cx="500" cy="500" rx="458" ry="245" />
-              <ellipse cx="500" cy="500" rx="458" ry="365" />
-              <ellipse cx="500" cy="500" rx="160" ry="462" />
-              <ellipse cx="500" cy="500" rx="310" ry="462" />
-              <path d="M500 38 C320 245 320 755 500 962 C680 755 680 245 500 38" />
-            </g>
-            <g class="earth-land" clip-path="url(#earth-clip)">
-              <path d="M240 197l86-65 93 17 39 64-27 47 49 50-35 71-79-9-40 70-75-18-51-90 14-80z" />
-              <path d="M449 290l70-29 58 36 44-6 55 43-19 60-66 8-21 57-55-13-54-66 8-90z" />
-              <path d="M518 467l74 22 46 78-27 69 25 86-57 122-55-42 9-107-46-79 19-81-30-49 42-19z" />
-              <path d="M637 166l111 18 71 64-4 61-71 11-46-52-80-21-18-46 37-35z" />
-              <path d="M744 388l96-26 83 61-31 85-61 17-34-43-72-19 19-75z" />
-              <path d="M231 521l80 18 23 65-38 61 13 97-55 44-44-88 7-93-39-48 53-56z" />
-            </g>
-            <circle class="earth-rim" cx="500" cy="500" r="462" />
-          </svg>
-          <span class="earth-shade"></span>
-        </div>
-        <div class="globe-network" aria-hidden="true">
-          <span class="network-arc arc-1"></span>
-          <span class="network-arc arc-2"></span>
-          <span class="network-arc arc-3"></span>
-          <span class="network-arc arc-4"></span>
-          <span class="network-node node-1"></span>
-          <span class="network-node node-2"></span>
-          <span class="network-node node-3"></span>
-        </div>
-      </div>
+  <body class="landing-page theme-dark">
+    <a class="landing-skip-link" href="#main-content">Skip to content</a>
 
-      <header class="topbar" aria-label="Dashboard navigation">
-        <a class="brand" href="index.html" aria-label="Geospatial Intelligence Election Dashboard home">
-          <img src="assets/geoinfotech-logo.jpeg" alt="GEOINFOTECH logo" />
-          <span>
-            <strong>Geospatial Intelligence</strong>
-            <strong>Election Dashboard</strong>
-          </span>
+    <header class="landing-header">
+      <div class="landing-container landing-header-inner">
+        <a class="landing-brand" href="index.html" aria-label="GEOINTEL Election Webapp home">
+          <span class="landing-brand-mark"><img src="assets/geointel-election-logo.png" alt="" /></span>
+          <span class="landing-brand-copy"><strong>GEOINTEL</strong><small>Election Webapp</small></span>
         </a>
 
-        <nav class="nav-links" aria-label="Primary navigation">
-          <a class="active" href="index.html">Home</a>
-          <a href="population.html">Population</a>
-          <a href="polling-units.html">Polling Units</a>
-          <a href="election-results.html">Election Results</a>
-          <a href="admin.html">Admin</a>
+        <button class="landing-menu-toggle" type="button" aria-expanded="false" aria-controls="landing-navigation">
+          <span></span><span></span><span></span><span class="sr-only">Toggle navigation</span>
+        </button>
+
+        <nav id="landing-navigation" class="landing-nav" aria-label="Landing page navigation">
+          <a href="#values">Core values</a>
+          <a href="#capabilities">Capabilities</a>
+          <a href="#statistics">Statistics</a>
+          <a href="#faq">FAQ</a>
         </nav>
-      </header>
 
-      <section class="hero" aria-labelledby="home-title">
-        <div class="hero-copy">
-          <p class="eyebrow">Welcome to the</p>
-          <h1 id="home-title">Geospatial Intelligence Election Dashboard</h1>
-          <p class="intro">
-            Interactive Global Geospatial Intelligence For Electoral Analysis, Polling Unit
-            Accessibility, Population Patterns, and Verified Election Results Worldwide.
-          </p>
+        <div class="landing-header-actions">
+          <button class="landing-theme-toggle" type="button" data-landing-theme aria-label="Switch to light mode">
+            <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+            <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z"></path></svg>
+          </button>
+          <a class="landing-button landing-button-light landing-header-cta" href="gateway.html">Enter dashboard <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
         </div>
+      </div>
+    </header>
 
-        <div class="page-cards" aria-label="Dashboard pages">
-          <a class="page-card population" href="population.html">
-            <span class="card-number">01</span>
-            <span class="card-title">Population &amp; Demographics</span>
-            <span class="card-text">
-              Explore population distribution, density, and demographic indicators.
-            </span>
-          </a>
+    <main id="main-content">
+      <section class="landing-hero" aria-labelledby="landing-title">
+        <div class="landing-orb landing-orb-one" aria-hidden="true"></div>
+        <div class="landing-orb landing-orb-two" aria-hidden="true"></div>
+        <div class="landing-container landing-hero-inner">
+          <div class="landing-hero-copy">
+            <p class="landing-badge">
 
-          <a class="page-card polling" href="polling-units.html">
-            <span class="card-number">02</span>
-            <span class="card-title">Polling Units &amp; Accessibility</span>
-            <span class="card-text">
-              Review polling unit locations, proximity, and service-area coverage.
-            </span>
-          </a>
+              World Election Geointelligence
+            </p>
+            <h1 id="landing-title">GEOINTEL<span>ELECTION WEBAPP</span></h1>
+            <p class="landing-lead">Explore population patterns, polling access, and election results across countries through one transparent, map-led intelligence platform built for better public understanding.</p>
+            <div class="landing-hero-actions">
+              <a class="landing-button landing-button-primary" href="gateway.html">Enter dashboard <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
+              <a class="landing-text-link" href="#capabilities">Explore capabilities <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+            </div>
+          </div>
 
-          <a class="page-card political" href="election-results.html">
-            <span class="card-number">03</span>
-            <span class="card-title">Latest Election Results</span>
-            <span class="card-text">
-              Follow declared winners, party performance, and candidate vote totals.
-            </span>
-          </a>
+          <div class="tv-showcase" data-tv-carousel tabindex="0" aria-roledescription="carousel" aria-label="Dashboard page previews">
+            <div class="tv-instruction">
+            </div>
+
+            <div class="tv-set">
+              <div class="tv-bezel">
+                <span class="tv-camera" aria-hidden="true"></span>
+                <div class="tv-screen">
+                  <div class="tv-track">
+                    <article class="tv-slide is-active" data-tv-title="Election Intelligence Gateway" aria-label="Election Intelligence Gateway preview">
+                      <iframe src="gateway.html?preview=tv" title="Election Intelligence Gateway preview" loading="eager" tabindex="-1"></iframe>
+                      <div class="tv-slide-shade" aria-hidden="true"></div>
+                      <div class="tv-slide-caption">
+                        <div><small>01 / Page two</small><strong>Election Intelligence Gateway</strong></div>
+                        <a href="gateway.html">Open page <span>&#8599;</span></a>
+                      </div>
+                    </article>
+                    <article class="tv-slide" data-tv-title="Population &amp; Demographics" aria-label="Population and Demographics preview" aria-hidden="true">
+                      <iframe src="population.html?preview=tv" title="Population and Demographics dashboard preview" loading="lazy" tabindex="-1"></iframe>
+                      <div class="tv-slide-shade" aria-hidden="true"></div>
+                      <div class="tv-slide-caption">
+                        <div><small>02 / Dashboard screen</small><strong>Population &amp; Demographics</strong></div>
+                        <a href="population.html">Open page <span>↗</span></a>
+                      </div>
+                    </article>
+                    <article class="tv-slide" data-tv-title="Polling Units &amp; Accessibility" aria-label="Polling Units and Accessibility preview" aria-hidden="true">
+                      <iframe src="polling-units.html?preview=tv" title="Polling Units and Accessibility dashboard preview" loading="lazy" tabindex="-1"></iframe>
+                      <div class="tv-slide-shade" aria-hidden="true"></div>
+                      <div class="tv-slide-caption">
+                        <div><small>03 / Dashboard screen</small><strong>Polling Units &amp; Accessibility</strong></div>
+                        <a href="polling-units.html">Open page <span>↗</span></a>
+                      </div>
+                    </article>
+                    <article class="tv-slide" data-tv-title="Latest Election Results" aria-label="Latest Election Results preview" aria-hidden="true">
+                      <iframe src="election-results.html?preview=tv" title="Latest Election Results dashboard preview" loading="lazy" tabindex="-1"></iframe>
+                      <div class="tv-slide-shade" aria-hidden="true"></div>
+                      <div class="tv-slide-caption">
+                        <div><small>04 / Dashboard screen</small><strong>Latest Election Results</strong></div>
+                        <a href="election-results.html">Open page <span>↗</span></a>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+
+                <button class="tv-control tv-control-prev" type="button" data-tv-prev aria-label="Show previous dashboard screen">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+                <button class="tv-control tv-control-next" type="button" data-tv-next aria-label="Show next dashboard screen">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+                </button>
+
+                <div class="tv-channel-bar">
+                  <span class="tv-channel-status" aria-live="polite">Election Intelligence Gateway</span>
+                  <div class="tv-dots" role="group" aria-label="Choose dashboard screen">
+                    <button class="is-active" type="button" data-tv-dot="0" aria-label="Show Election Intelligence Gateway" aria-current="true"></button>
+                    <button type="button" data-tv-dot="1" aria-label="Show Population and Demographics"></button>
+                    <button type="button" data-tv-dot="2" aria-label="Show Polling Units and Accessibility"></button>
+                    <button type="button" data-tv-dot="3" aria-label="Show Latest Election Results"></button>
+                  </div>
+                </div>
+              </div>
+              <div class="tv-neck" aria-hidden="true"></div>
+              <div class="tv-base" aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="product-preview-wrap legacy-preview" aria-hidden="true" hidden>
+            <div class="product-preview-glow" aria-hidden="true"></div>
+            <div class="product-preview">
+              <div class="preview-topbar">
+                <div class="preview-brand"><span class="preview-brand-mark">GI</span><span>GEOSPATIAL ELECTION INTELLIGENCE</span></div>
+                <div class="preview-status"><span></span> Data available</div>
+                <div class="preview-clock">09:41 WAT</div>
+              </div>
+
+              <div class="preview-layout">
+                <aside class="preview-sidebar" aria-hidden="true">
+                  <p>Workspace</p>
+                  <span class="active"><i></i> Overview</span>
+                  <span><i></i> Population &amp; PVC</span>
+                  <span><i></i> Polling units</span>
+                  <span><i></i> Election results</span>
+                  <span><i></i> Reports</span>
+                  <div class="preview-side-filter"><small>Election year</small><b>Latest available</b><small>Geography</small><b>World</b></div>
+                </aside>
+
+                <div class="preview-main">
+                  <div class="preview-heading-row">
+                    <div><p>Global overview</p><h2>Election intelligence</h2></div>
+                    <span class="preview-filter">All countries</span>
+                  </div>
+                  <div class="preview-metrics">
+                    <article><small>Coverage</small><strong>Global</strong><span class="teal">Country intelligence</span></article>
+                    <article><small>Election scope</small><strong>Multi-level</strong><span class="blue">National to local</span></article>
+                    <article><small>Geography</small><strong>Mapped</strong><span class="violet">Spatial context</span></article>
+                    <article><small>Data status</small><strong>Source-aware</strong><span class="orange">Traceable evidence</span></article>
+                  </div>
+
+                  <div class="preview-content-grid">
+                    <article class="preview-map-card">
+                      <div class="preview-card-title"><span>World election map</span><small>Country view</small></div>
+                      <div class="preview-map-stage">
+                        <svg class="preview-world-map" viewBox="0 0 520 300" role="img" aria-label="Stylised world election map">
+                          <defs><linearGradient id="preview-map-fill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#238bc0" /><stop offset="0.55" stop-color="#2b6e99" /><stop offset="1" stop-color="#244b70" /></linearGradient></defs>
+                          <path class="map-outline" d="M37 87 61 58l37-12 31 12 16 25 32 10 15 29-17 18-31-8-15 20-23-6-15 17-23-20-26-8-11-24Zm148 81 24 8 15 30-8 46-20 28-14-21 5-28-14-26 12-37Zm63-92 28-28 46-8 36 15 36-4 46 21 36 4 17 23-19 18-32-4-15 20-27-8-17 18-25-7-13-25-31-5-18-17-31-1-17-12Zm131 77 28 8 14 28-17 24-30-6-17-20 22-34Zm72 71 25-10 21 11-8 18-30 5-8-24Z" />
+                          <path d="M17 150h486M52 76c83 35 153 38 215 18 82-27 151-25 221 7M62 218c89-31 173-31 252-7 60 18 112 20 166 4M130 28c-20 74-18 156 8 244M260 24c-13 79-12 164 4 252M390 27c21 80 17 161-11 243" />
+                          <circle cx="107" cy="111" r="6"></circle><circle cx="273" cy="102" r="6"></circle><circle cx="343" cy="122" r="5"></circle><circle cx="407" cy="186" r="5"></circle><circle cx="202" cy="207" r="5"></circle>
+                        </svg>
+                        <div class="preview-map-legend"><span><i></i> Election data</span><span><i></i> Selected area</span></div>
+                      </div>
+                    </article>
+                    <article class="preview-analysis-card">
+                      <div class="preview-card-title"><span>Participation snapshot</span><small>Selected election</small></div>
+                      <div class="preview-donut"><div><strong>27.1%</strong><small>turnout</small></div></div>
+                      <div class="preview-bars">
+                        <p><span>Accredited</span><b>25.28M</b></p><i><em style="width: 72%"></em></i>
+                        <p><span>Valid votes</span><b>24.03M</b></p><i><em style="width: 64%"></em></i>
+                        <p><span>Rejected</span><b>0.94M</b></p><i><em style="width: 18%"></em></i>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <!-- <section class="metrics" aria-label="National election coverage summary">
-        <div>
-          <strong>36</strong>
-          <span>States + FCT</span>
-        </div>
-        <div>
-          <strong>774</strong>
-          <span>LGAs</span>
-        </div>
-        <div>
-          <strong>8,809+</strong>
-          <span>Wards</span>
-        </div>
-        <div>
-          <strong>176,000+</strong>
-          <span>Polling Units</span>
-        </div>
-        <div>
-          <strong>93M+</strong>
-          <span>Population</span>
+      <section id="capabilities" class="landing-section landing-capabilities" aria-labelledby="capabilities-title">
+        <div class="landing-container">
+          <div class="landing-section-heading landing-section-heading-left"><div><p>Explore the platform</p><h2 id="capabilities-title">One platform. A world of electoral insight.</h2></div><span>Move from global patterns to local detail without losing the wider electoral context.</span></div>
+          <div class="capability-grid">
+            <a class="capability-card capability-population" href="population.html"><span class="capability-label">Population &amp; PVC</span><h3>Understand the people behind the map.</h3><p>Compare population, voter registration, PVC collection, density, and demographic patterns across administrative areas.</p><span class="capability-link">Open population intelligence <b>→</b></span><div class="capability-visual capability-visual-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div></a>
+            <a class="capability-card capability-polling" href="polling-units.html"><span class="capability-label">Polling units</span><h3>See access and coverage at local level.</h3><p>Find polling units, explore their distribution, and reveal underserved wards and accessibility gaps.</p><span class="capability-link">Explore polling units <b>→</b></span><div class="capability-visual capability-visual-points" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div></a>
+            <a class="capability-card capability-results" href="election-results.html"><span class="capability-label">Election results</span><h3>Read performance with geographic context.</h3><p>Review winners, party performance, candidate votes, turnout, and result patterns across available countries.</p><span class="capability-link">View election results <b>→</b></span><div class="capability-visual capability-visual-lines" aria-hidden="true"><svg viewBox="0 0 220 90"><path d="M4 74 43 57l32 8 39-38 34 21 28-28 40 9"></path><path d="M4 82h212"></path></svg></div></a>
+          </div>
         </div>
       </section>
-  
+
+      <section id="faq" class="landing-section landing-faq" aria-labelledby="faq-title">
+        <div class="landing-container faq-layout">
+          <div class="landing-section-heading landing-section-heading-left faq-heading"><div><p>Frequently asked questions</p><h2 id="faq-title">Start with the essentials.</h2></div><span>Learn what the dashboard covers, where its information comes from, and how to use it responsibly.</span></div>
+          <div class="faq-list">
+            <details open><summary>What is the Geospatial Intelligence Election Dashboard?<span></span></summary><p>It is an interactive platform for exploring election results, population and PVC indicators, and polling-unit accessibility through maps and data visualisations.</p></details>
+            <details><summary>Can I explore information below country level?<span></span></summary><p>Yes. Where data is available, the platform can support country, region, district, ward, and polling-location views.</p></details>
+            <details><summary>Are dashboard figures official final results?<span></span></summary><p>Always check the source and status shown with each dataset. Where applicable, official election declarations remain the authoritative record.</p></details>
+            <details><summary>Can I download or share what I find?<span></span></summary><p>Reporting and share tools are being expanded progressively. Existing pages provide the available export options for their datasets.</p></details>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-final-cta">
+        <div class="landing-container landing-final-cta-inner"><div><p>Explore the data</p><h2>Move from information to geographic insight.</h2></div><a class="landing-button landing-button-light" href="gateway.html">Enter dashboard <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a></div>
+      </section>
     </main>
+
+    <footer class="landing-footer">
+      <div class="landing-container landing-footer-inner"><a class="landing-brand" href="index.html"><span class="landing-brand-mark"><img src="assets/geointel-election-logo.png" alt="" /></span><span class="landing-brand-copy"><strong>GEOINTEL</strong><small>Election Webapp</small></span></a><p>Worldwide geospatial clarity for better electoral understanding.</p><span>&copy; <span id="landing-year">2026</span> GEOINTEL</span></div>
+    </footer>
+    <script src="landing.js"></script>
   </body>
-</html> -->
+</html>

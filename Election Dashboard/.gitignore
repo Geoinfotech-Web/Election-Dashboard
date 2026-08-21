@@ -16,6 +16,7 @@ admin-settings.json
 server.err.log
 server.out.log
 server.log
+server.autostart.*.log
 
 # large binary/data
 NGA_adm.zip

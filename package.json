@@ -1,0 +1,7 @@
+{
+  "name": "election-dashboard-workspace",
+  "private": true,
+  "scripts": {
+    "start": "npm --prefix \"Election Dashboard\" start"
+  }
+}

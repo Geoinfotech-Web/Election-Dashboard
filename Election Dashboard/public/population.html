@@ -8,6 +8,24 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="dashboard-page population-page">
+    <script>
+      (function () {
+        const parameters = new URLSearchParams(window.location.search);
+        if (parameters.get('embedded') !== 'intel') return;
+        document.body.classList.add('population-intel-embedded');
+        window.addEventListener('message', function (event) {
+          if (event.origin !== window.location.origin || !event.data) return;
+          if (event.data.type === 'geointel-theme') {
+            const isLight = event.data.theme === 'light';
+            document.body.classList.toggle('theme-light', isLight);
+            document.body.classList.toggle('theme-dark', !isLight);
+          }
+          if (event.data.type === 'geointel-resize') {
+            window.dispatchEvent(new Event('resize'));
+          }
+        });
+      })();
+    </script>
     <aside class="side-nav">
       <a class="side-brand" href="index.html">
         <img src="assets/geoinfotech-logo.jpeg" alt="GEOINFOTECH logo" />
