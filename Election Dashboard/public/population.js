@@ -2,7 +2,6 @@ const map = L.map('populationMap', {
   zoomControl: true,
   attributionControl: true,
   maxBoundsViscosity: 1,
-  zoomSnap: 0.25,
 }).setView([9.082, 8.6753], 6);
 
 const baseMaps = {
@@ -158,10 +157,10 @@ let globalFillOpacityPercent = 95; // percent
 let globalStrokeWeight = 2; // pixels
 
 const FALLBACK_NIGERIA_SUMMARY = {
-  population: 180361237,
-  registeredVoters: 93469008,
-  collectedPVCs: 87209007,
-  uncollectedPVCs: 6259229,
+  population: 360722474,
+  registeredVoters: 186938016,
+  collectedPVCs: 174418014,
+  uncollectedPVCs: 12518460,
 };
 
 const STATE_LABEL_POSITIONS = {
@@ -411,22 +410,7 @@ function getNigeriaSummary() {
     return FALLBACK_NIGERIA_SUMMARY;
   }
 
-  const nationalTotal = populationData.statePopulation.find(
-    (row) => normalizeStateLookupKey(row.state) === 'total'
-  );
-
-  if (nationalTotal) {
-    return {
-      population: Number(nationalTotal.population || 0),
-      registeredVoters: Number(nationalTotal.registeredVoters || 0),
-      collectedPVCs: Number(nationalTotal.collectedPVCs || 0),
-      uncollectedPVCs: Number(nationalTotal.uncollectedPVCs || 0),
-    };
-  }
-
-  return populationData.statePopulation
-    .filter((row) => normalizeStateLookupKey(row.state) !== 'total')
-    .reduce(
+  return populationData.statePopulation.reduce(
     (summary, row) => ({
       population: summary.population + row.population,
       registeredVoters: summary.registeredVoters + row.registeredVoters,
@@ -2453,12 +2437,6 @@ async function initPopulationMap() {
     nigeriaBounds = L.geoJSON(adm0Data).getBounds();
     keepMapFocusedOnNigeria();
     renderLayer('state');
-    if (document.body.classList.contains('population-intel-embedded')) {
-      window.setTimeout(() => {
-        map.invalidateSize({ animate: false });
-        fitToCurrentExtent();
-      }, 120);
-    }
     refreshDetailsPanel();
     map.on('zoomend', handlePopulationZoomEnd);
     startPopulationDataAutoRefresh();
@@ -2469,15 +2447,6 @@ async function initPopulationMap() {
     }
   }
 }
-
-window.addEventListener('message', (event) => {
-  if (event.origin !== window.location.origin || event.data?.type !== 'geointel-resize') return;
-  window.setTimeout(() => {
-    map.invalidateSize({ animate: false });
-    fitToCurrentExtent();
-    africaLocatorMap?.invalidateSize({ animate: false });
-  }, 80);
-});
 
 stateSelect.addEventListener('change', () => {
   clearAllModes();

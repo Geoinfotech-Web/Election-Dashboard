@@ -1,5 +1,6 @@
 {
   "files.associations": {
-    "*.dc.html": "plaintext"
+    "*.dc.html": "plaintext",
+    "Election Dashboard/public/index.html": "plaintext"
   }
 }

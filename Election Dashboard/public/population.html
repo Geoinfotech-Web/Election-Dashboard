@@ -2,30 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="refresh" content="0;url=index.html" />
-    <title>Redirecting…</title>
-    <script>location.replace("index.html");</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Population & Demographics | Nigeria Election GIS Dashboard</title>
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
-<<<<<<< HEAD
   <body class="dashboard-page population-page">
-    <script>
-      (function () {
-        const parameters = new URLSearchParams(window.location.search);
-        if (parameters.get('embedded') !== 'intel') return;
-        document.body.classList.add('population-intel-embedded');
-        window.addEventListener('message', function (event) {
-          if (event.origin !== window.location.origin || !event.data) return;
-          if (event.data.type === 'geointel-theme') {
-            const isLight = event.data.theme === 'light';
-            document.body.classList.toggle('theme-light', isLight);
-            document.body.classList.toggle('theme-dark', !isLight);
-          }
-          if (event.data.type === 'geointel-resize') {
-            window.dispatchEvent(new Event('resize'));
-          }
-        });
-      })();
-    </script>
     <aside class="side-nav">
       <a class="side-brand" href="index.html">
         <img src="assets/geoinfotech-logo.jpeg" alt="GEOINFOTECH logo" />
@@ -199,9 +181,5 @@
     <script src="vendor/chart.js/chart.umd.min.js"></script>
     <script src="theme.js"></script>
     <script src="population.js"></script>
-=======
-  <body>
-    <p><a href="index.html">Open the Election Intelligence Dashboard</a></p>
->>>>>>> e258d0f0ca141b06dab124b0e4367db71891a385
   </body>
 </html>

@@ -5,10 +5,13 @@
   const themeButton = document.querySelector('[data-intel-theme]');
   const navigationButtons = Array.from(document.querySelectorAll('[data-intel-section]'));
   const views = Array.from(document.querySelectorAll('[data-intel-view]'));
+  const countryFilter = document.getElementById('intel-country-filter');
   const stateFilter = document.getElementById('intel-state-filter');
   const yearFilter = document.getElementById('intel-year-filter');
   const typeFilter = document.getElementById('intel-type-filter');
   const statusFilter = document.getElementById('intel-status-filter');
+  const filterSelects = { country: countryFilter, state: stateFilter, year: yearFilter, type: typeFilter, status: statusFilter };
+  const comboboxState = new Map();
   const sectionMeta = {
     overview: ['Nigeria · National overview', 'Election intelligence', 'A source-aware view of electoral geography, participation, population, and available results.'],
     population: ['Nigeria · Population & demographics', 'People behind the electoral map', 'Compare population, voter registration, PVC collection, and geographic distribution across Nigeria.'],
@@ -42,6 +45,172 @@
     return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
   }
 
+  function normalizeText(value) {
+    return String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  function optionList(select) {
+    return Array.from(select?.options || []).map((option) => ({
+      value: option.value,
+      label: option.textContent.trim(),
+      disabled: option.disabled
+    }));
+  }
+
+  function selectedOptionLabel(select) {
+    return select?.selectedOptions?.[0]?.textContent?.trim() || select?.options?.[select.selectedIndex]?.textContent?.trim() || '';
+  }
+
+  function syncCombobox(select, { refreshMenu = false } = {}) {
+    const combo = comboboxState.get(select?.id);
+    if (!combo) return;
+    combo.input.value = selectedOptionLabel(select);
+    combo.input.title = combo.input.value;
+    combo.input.setAttribute('aria-valuetext', combo.input.value);
+    if (refreshMenu) renderComboboxMenu(combo);
+  }
+
+  function closeCombobox(combo, { restore = true } = {}) {
+    if (!combo || combo.menu.hidden) return;
+    combo.open = false;
+    combo.wrapper.classList.remove('is-open');
+    combo.menu.hidden = true;
+    combo.input.setAttribute('aria-expanded', 'false');
+    combo.activeIndex = -1;
+    combo.input.removeAttribute('aria-activedescendant');
+    if (restore) combo.input.value = selectedOptionLabel(combo.select);
+  }
+
+  function openCombobox(combo) {
+    if (!combo || combo.open) return;
+    combo.open = true;
+    combo.wrapper.classList.add('is-open');
+    combo.menu.hidden = false;
+    combo.input.setAttribute('aria-expanded', 'true');
+    renderComboboxMenu(combo);
+  }
+
+  function selectComboboxValue(combo, value) {
+    if (!combo) return;
+    combo.select.value = value;
+    combo.select.dispatchEvent(new Event('change', { bubbles: true }));
+    syncCombobox(combo.select, { refreshMenu: true });
+    closeCombobox(combo, { restore: true });
+  }
+
+  function renderComboboxMenu(combo) {
+    if (!combo) return;
+    const query = normalizeText(combo.input.value);
+    const selectedValue = combo.select.value;
+    const visibleOptions = combo.options.filter((option) => !option.disabled && (!query || normalizeText(option.label).includes(query)));
+    combo.menu.innerHTML = visibleOptions.length
+      ? visibleOptions.map((option, index) => `<button id="${escapeHtml(combo.menu.id)}-option-${index}" type="button" class="intel-combobox-option${option.value === selectedValue ? ' is-selected' : ''}" role="option" aria-selected="${option.value === selectedValue ? 'true' : 'false'}" data-value="${escapeHtml(option.value)}" data-index="${index}">${escapeHtml(option.label)}</button>`).join('')
+      : `<div class="intel-combobox-empty">No matches</div>`;
+    combo.activeIndex = Math.min(combo.activeIndex, visibleOptions.length - 1);
+    combo.menu.querySelectorAll('.intel-combobox-option').forEach((option, index) => {
+      option.classList.toggle('is-active', index === combo.activeIndex);
+      option.setAttribute('aria-selected', String(option.dataset.value === selectedValue));
+    });
+  }
+
+  function highlightComboboxOption(combo, direction) {
+    const options = Array.from(combo.menu.querySelectorAll('.intel-combobox-option'));
+    if (!options.length) return;
+    const nextIndex = combo.activeIndex < 0
+      ? (direction > 0 ? 0 : options.length - 1)
+      : (combo.activeIndex + direction + options.length) % options.length;
+    combo.activeIndex = nextIndex;
+    options.forEach((option, index) => option.classList.toggle('is-active', index === combo.activeIndex));
+    const active = options[combo.activeIndex];
+    if (active) {
+      combo.input.setAttribute('aria-activedescendant', active.id);
+      active.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function commitComboboxSelection(combo) {
+    const active = combo.menu.querySelector('.intel-combobox-option.is-active') || combo.menu.querySelector('.intel-combobox-option');
+    if (active) selectComboboxValue(combo, active.dataset.value);
+  }
+
+  function setupCombobox(select) {
+    if (!select) return;
+    const comboName = Object.entries(filterSelects).find(([, element]) => element === select)?.[0];
+    const wrapper = select.closest('[data-intel-combobox]');
+    if (!comboName || !wrapper) return;
+    const input = wrapper.querySelector('.intel-combobox-input');
+    const menu = wrapper.querySelector('.intel-combobox-menu');
+    const toggle = wrapper.querySelector('.intel-combobox-toggle');
+    const combo = {
+      name: comboName,
+      select,
+      wrapper,
+      input,
+      menu,
+      toggle,
+      options: optionList(select),
+      activeIndex: -1,
+      open: false,
+      closed: false
+    };
+    comboboxState.set(select.id, combo);
+    syncCombobox(select);
+    renderComboboxMenu(combo);
+    select.addEventListener('change', () => {
+      combo.options = optionList(select);
+      syncCombobox(select, { refreshMenu: true });
+    });
+    input.addEventListener('focus', () => openCombobox(combo));
+    input.addEventListener('input', () => {
+      openCombobox(combo);
+      combo.activeIndex = -1;
+      renderComboboxMenu(combo);
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        openCombobox(combo);
+        highlightComboboxOption(combo, 1);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        openCombobox(combo);
+        highlightComboboxOption(combo, -1);
+      } else if (event.key === 'Enter') {
+        if (!combo.menu.hidden) {
+          event.preventDefault();
+          commitComboboxSelection(combo);
+        }
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        closeCombobox(combo, { restore: true });
+      }
+    });
+    input.addEventListener('blur', () => {
+      window.setTimeout(() => closeCombobox(combo, { restore: true }), 120);
+    });
+    toggle.addEventListener('click', () => {
+      if (combo.menu.hidden) openCombobox(combo);
+      else closeCombobox(combo, { restore: true });
+      input.focus();
+    });
+    menu.addEventListener('pointerdown', (event) => {
+      const item = event.target.closest('.intel-combobox-option');
+      if (!item) return;
+      event.preventDefault();
+      selectComboboxValue(combo, item.dataset.value);
+    });
+  }
+
+  function setupComboboxes() {
+    comboboxState.clear();
+    Object.values(filterSelects).forEach((select) => setupCombobox(select));
+    document.addEventListener('pointerdown', (event) => {
+      if (!Array.from(comboboxState.values()).some((combo) => combo.wrapper.contains(event.target))) {
+        comboboxState.forEach((combo) => closeCombobox(combo, { restore: true }));
+      }
+    });
+  }
+
   function applyTheme(theme) {
     const isLight = theme === 'light';
     body.classList.toggle('theme-light', isLight);
@@ -64,9 +233,12 @@
     });
     views.forEach((view) => view.classList.toggle('is-active', view.dataset.intelView === section));
     const [kicker, title, description] = sectionMeta[section];
-    document.getElementById('intel-kicker').textContent = kicker;
-    document.getElementById('intel-page-title').textContent = title;
-    document.getElementById('intel-page-description').textContent = description;
+    const kickerEl = document.getElementById('intel-kicker');
+    const titleEl = document.getElementById('intel-page-title');
+    const descEl = document.getElementById('intel-page-description');
+    if (kickerEl) kickerEl.textContent = kicker;
+    if (titleEl) titleEl.textContent = title;
+    if (descEl) descEl.textContent = description;
     body.classList.remove('intel-mobile-nav-open');
     if (section === 'overview' && model.map) window.setTimeout(() => model.map.invalidateSize(), 80);
     if (section === 'population') {
@@ -76,8 +248,8 @@
     history.replaceState(null, '', `${window.location.pathname}?country=NG&section=${section}`);
   }
 
-  function kpiCard(label, value, note, icon, tone = 'teal') {
-    return `<article class="intel-kpi intel-kpi-${tone}"><div><span>${icon}</span><small>${escapeHtml(label)}</small></div><strong>${escapeHtml(value)}</strong><p>${escapeHtml(note)}</p></article>`;
+  function kpiCard(label, value, note, tone = 'teal') {
+    return `<article class="intel-kpi intel-kpi-${tone}"><div><span class="intel-kpi-mark" aria-hidden="true"></span><small>${escapeHtml(label)}</small></div><strong>${escapeHtml(value)}</strong><p>${escapeHtml(note)}</p></article>`;
   }
 
   function getNationalPopulation() {
@@ -90,11 +262,11 @@
     const latest = model.results?.latest || {};
     const resultTotals = latest.totals || {};
     document.getElementById('intel-kpi-grid').innerHTML = [
-      kpiCard('Population', formatNumber(total.population, true), 'National dataset estimate', '◉', 'blue'),
-      kpiCard('Registered voters', formatNumber(total.registeredVoters, true), 'Across 36 states and FCT', '▣', 'teal'),
-      kpiCard('PVCs collected', formatNumber(total.collectedPVCs, true), `${formatPercent(total.pvcCollectionRate)} collection rate`, '✓', 'green'),
-      kpiCard('Polling units', formatNumber(polling.totalPollingUnits), `${formatNumber(polling.totalWards)} wards represented`, '⌖', 'violet'),
-      kpiCard('Latest valid votes', formatNumber(resultTotals.validVotes), latest.state ? `${latest.state} archive` : 'Result archive', '▥', 'amber')
+      kpiCard('Population', formatNumber(total.population, true), 'National dataset estimate', 'blue'),
+      kpiCard('Registered voters', formatNumber(total.registeredVoters, true), 'Across 36 states and FCT', 'teal'),
+      kpiCard('PVCs collected', formatNumber(total.collectedPVCs, true), `${formatPercent(total.pvcCollectionRate)} collection rate`, 'green'),
+      kpiCard('Polling units', formatNumber(polling.totalPollingUnits), `${formatNumber(polling.totalWards)} wards represented`, 'violet'),
+      kpiCard('Latest valid votes', formatNumber(resultTotals.validVotes), latest.state ? `${latest.state} archive` : 'Result archive', 'amber')
     ].join('');
   }
 
@@ -135,11 +307,6 @@
 
   function updateMapSelection(stateName, fit = false) {
     const isNational = !stateName || stateName === 'all';
-    const row = isNational ? getNationalPopulation() : model.stateRows.find((item) => stateKey(item.state) === stateKey(stateName));
-    const label = isNational ? 'Nigeria' : (row?.state || stateName);
-    document.getElementById('intel-map-breadcrumb').textContent = `Nigeria / ${isNational ? 'All states' : label}`;
-    document.getElementById('intel-map-selection').innerHTML = `<p>Selected geography</p><strong>${escapeHtml(label)}</strong><span>${isNational ? 'Choose a state on the map to drill down.' : `${formatNumber(row?.population)} people · ${formatNumber(row?.registeredVoters)} registered voters · ${formatPercent(row?.pvcCollectionRate)} PVC rate`}</span>`;
-    if (stateFilter.value !== (isNational ? 'all' : label)) stateFilter.value = isNational ? 'all' : label;
     if (model.selectedLayer) {
       model.boundaryLayer.resetStyle(model.selectedLayer);
       model.selectedLayer = null;
@@ -148,6 +315,9 @@
       if (fit && model.boundaryLayer) model.map.fitBounds(model.boundaryLayer.getBounds(), { padding: [18, 18] });
       return;
     }
+    const row = model.stateRows.find((item) => stateKey(item.state) === stateKey(stateName));
+    const label = row?.state || stateName;
+    if (stateFilter.value !== label) stateFilter.value = label;
     model.boundaryLayer?.eachLayer((layer) => {
       if (stateKey(featureStateName(layer.feature)) !== stateKey(label)) return;
       model.selectedLayer = layer;
@@ -159,7 +329,24 @@
 
   async function initializeMap() {
     const mapElement = document.getElementById('intel-election-map');
-    model.map = L.map(mapElement, { zoomControl: true, scrollWheelZoom: false, attributionControl: false, preferCanvas: true }).setView([9.08, 8.68], 6);
+    model.map = L.map(mapElement, { zoomControl: true, scrollWheelZoom: false, attributionControl: true, preferCanvas: true }).setView([9.08, 8.68], 6);
+    const tileAttribution = '&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors';
+    const googleAttribution = 'Map data &copy; <a href="https://www.google.com/help/terms_maps/">Google</a>';
+    const baseMaps = {
+      streets: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: tileAttribution }),
+      satellite: L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: googleAttribution })
+    };
+    let activeBaseMap = baseMaps.satellite.addTo(model.map);
+    document.querySelectorAll('[data-intel-basemap]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const selectedBaseMap = baseMaps[button.dataset.intelBasemap];
+        if (!selectedBaseMap || selectedBaseMap === activeBaseMap) return;
+        model.map.removeLayer(activeBaseMap);
+        activeBaseMap = selectedBaseMap.addTo(model.map);
+        activeBaseMap.bringToBack();
+        document.querySelectorAll('[data-intel-basemap]').forEach((item) => item.classList.toggle('is-active', item === button));
+      });
+    });
     const response = await fetch('data/boundaries/adm1.zip');
     if (!response.ok) throw new Error('Nigeria state boundaries could not be loaded.');
     let boundaries = await shp(await response.arrayBuffer());
@@ -188,10 +375,10 @@
     const total = getNationalPopulation();
     const polling = model.polling?.summary || {};
     document.getElementById('intel-population-kpis').innerHTML = [
-      kpiCard('Total population', formatNumber(total.population), 'National dataset estimate', '◉', 'blue'),
-      kpiCard('Registered voters', formatNumber(total.registeredVoters), `${formatPercent((total.registeredVoters / total.population) * 100)} of population`, '▣', 'teal'),
-      kpiCard('Collected PVCs', formatNumber(total.collectedPVCs), `${formatPercent(total.pvcCollectionRate)} collection rate`, '✓', 'green'),
-      kpiCard('Population per polling unit', formatNumber(polling.nationalPopulationPerPollingUnit), 'National service pressure', '⌖', 'amber')
+      kpiCard('Total population', formatNumber(total.population), 'National dataset estimate', 'blue'),
+      kpiCard('Registered voters', formatNumber(total.registeredVoters), `${formatPercent((total.registeredVoters / total.population) * 100)} of population`, 'teal'),
+      kpiCard('Collected PVCs', formatNumber(total.collectedPVCs), `${formatPercent(total.pvcCollectionRate)} collection rate`, 'green'),
+      kpiCard('Population per polling unit', formatNumber(polling.nationalPopulationPerPollingUnit), 'National service pressure', 'amber')
     ].join('');
   }
 
@@ -207,7 +394,7 @@
 
   function renderElections() {
     const elections = availableElections();
-    document.getElementById('intel-election-list').innerHTML = elections.length ? elections.map((row) => `<button type="button" data-open-results><span class="intel-election-date"><b>${new Date(`${row.electionDate}T00:00:00`).getFullYear()}</b><small>${formatDate(row.electionDate)}</small></span><span><strong>${escapeHtml(row.election)}</strong><small>${escapeHtml(row.state)} · Governorship · Completed</small></span><span class="intel-election-winner"><small>Declared winner</small><b>${escapeHtml(row.winner?.name || '—')}</b><em>${escapeHtml(row.winner?.party || '—')}</em></span><i>›</i></button>`).join('') : `<div class="intel-large-empty"><b>No matching election archive</b><span>Change the year, election type, or status filter to see available records.</span></div>`;
+    document.getElementById('intel-election-list').innerHTML = elections.length ? elections.map((row) => `<button type="button" data-open-results><span class="intel-election-date"><b>${new Date(`${row.electionDate}T00:00:00`).getFullYear()}</b><small>${formatDate(row.electionDate)}</small></span><span><strong>${escapeHtml(row.election)}</strong><small>${escapeHtml(row.state)} - Governorship - Completed</small></span><span class="intel-election-winner"><small>Declared winner</small><b>${escapeHtml(row.winner?.name || '—')}</b><em>${escapeHtml(row.winner?.party || '—')}</em></span><i>›</i></button>`).join('') : `<div class="intel-large-empty"><b>No matching election archive</b><span>Change the year, election type, or status filter to see available records.</span></div>`;
     document.querySelectorAll('#intel-election-list [data-open-results]').forEach((button) => button.addEventListener('click', () => showSection('results')));
   }
 
@@ -219,10 +406,10 @@
     const result = model.results?.latest;
     if (!result) return;
     const totals = result.totals || {};
-    document.getElementById('intel-result-summary').innerHTML = `<article class="intel-winner-panel"><span>Declared result</span><div><small>${escapeHtml(result.election)}</small><h2>${escapeHtml(result.winner?.name || '—')}</h2><p>${escapeHtml(result.winner?.party || '—')} · ${formatNumber(result.winner?.votes)} votes</p></div><dl><div><dt>Valid votes</dt><dd>${formatNumber(totals.validVotes)}</dd></div><div><dt>Accredited</dt><dd>${formatNumber(totals.accreditedVoters)}</dd></div><div><dt>Rejected</dt><dd>${formatNumber(totals.rejectedVotes)}</dd></div><div><dt>LGAs won</dt><dd>${formatNumber(totals.lgAsWon)}</dd></div></dl></article>`;
+    document.getElementById('intel-result-summary').innerHTML = `<article class="intel-winner-panel"><span>Declared result</span><div><small>${escapeHtml(result.election)}</small><h2>${escapeHtml(result.winner?.name || '—')}</h2><p>${escapeHtml(result.winner?.party || '—')} - ${formatNumber(result.winner?.votes)} votes</p></div><dl><div><dt>Valid votes</dt><dd>${formatNumber(totals.validVotes)}</dd></div><div><dt>Accredited</dt><dd>${formatNumber(totals.accreditedVoters)}</dd></div><div><dt>Rejected</dt><dd>${formatNumber(totals.rejectedVotes)}</dd></div><div><dt>LGAs won</dt><dd>${formatNumber(totals.lgAsWon)}</dd></div></dl></article>`;
     const candidates = result.candidates || [];
     const maxVotes = Math.max(...candidates.map((candidate) => Number(candidate.votes || 0)), 1);
-    document.getElementById('intel-result-bars').innerHTML = candidates.slice(0, 10).map((candidate) => `<div class="intel-bar-row"><div><b>${escapeHtml(candidate.name)}</b><span>${escapeHtml(candidate.party)} · ${formatNumber(candidate.votes)}</span></div><i><em style="width:${Math.max(1, (Number(candidate.votes) / maxVotes) * 100)}%;background:${candidateColor(candidate.party)}"></em></i></div>`).join('');
+    document.getElementById('intel-result-bars').innerHTML = candidates.slice(0, 10).map((candidate) => `<div class="intel-bar-row"><div><b>${escapeHtml(candidate.name)}</b><span>${escapeHtml(candidate.party)} - ${formatNumber(candidate.votes)}</span></div><i><em style="width:${Math.max(1, (Number(candidate.votes) / maxVotes) * 100)}%;background:${candidateColor(candidate.party)}"></em></i></div>`).join('');
     document.getElementById('intel-result-sources').innerHTML = (result.sources || []).map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer"><span>↗</span><div><b>${escapeHtml(source.publisher)}</b><small>${escapeHtml(source.title)}</small></div></a>`).join('');
   }
 
@@ -246,10 +433,10 @@
     const rejectionRate = totalBallots ? (Number(totals.rejectedVotes) / totalBallots) * 100 : 0;
     const validRate = totalBallots ? (Number(totals.validVotes) / totalBallots) * 100 : 0;
     document.getElementById('intel-analysis-kpis').innerHTML = [
-      kpiCard('Accredited voters', formatNumber(totals.accreditedVoters), result.state || 'Selected election', '▣', 'blue'),
-      kpiCard('Valid ballot rate', formatPercent(validRate), 'Of accounted ballots', '✓', 'green'),
-      kpiCard('Rejected ballot rate', formatPercent(rejectionRate), 'Of accounted ballots', '!', 'amber'),
-      kpiCard('Winning vote share', formatPercent(totals.validVotes ? (Number(result.winner?.votes || 0) / Number(totals.validVotes)) * 100 : 0), result.winner?.party || 'Winner', '◇', 'violet')
+      kpiCard('Accredited voters', formatNumber(totals.accreditedVoters), result.state || 'Selected election', 'blue'),
+      kpiCard('Valid ballot rate', formatPercent(validRate), 'Of accounted ballots', 'green'),
+      kpiCard('Rejected ballot rate', formatPercent(rejectionRate), 'Of accounted ballots', 'amber'),
+      kpiCard('Winning vote share', formatPercent(totals.validVotes ? (Number(result.winner?.votes || 0) / Number(totals.validVotes)) * 100 : 0), result.winner?.party || 'Winner', 'violet')
     ].join('');
     const accounting = [
       { name: 'Accredited voters', value: Number(totals.accreditedVoters || 0) },
@@ -270,7 +457,37 @@
       ['Administrative boundaries', 'Shapefile', 'National / state / LGA', 'Local assets', 'Nigeria administrative boundaries used for geographic selection and drill-down.', 'data/boundaries/adm1.zip'],
       ['Election results', 'JSON API', 'Available state archive', 'Source-linked', 'Declared winners, candidate totals, ballot accounting, election history, and publication sources.', 'election-results.html']
     ];
-    document.getElementById('intel-data-grid').innerHTML = cards.map(([name, format, coverage, updated, description, href]) => `<article class="intel-data-card"><span>▤</span><div><small>${escapeHtml(format)} · ${escapeHtml(coverage)}</small><h2>${escapeHtml(name)}</h2><p>${escapeHtml(description)}</p><footer><em>${escapeHtml(updated)}</em><a href="${escapeHtml(href)}">Open ↗</a></footer></div></article>`).join('');
+    document.getElementById('intel-data-grid').innerHTML = cards.map(([name, format, coverage, updated, description, href]) => `<article class="intel-data-card"><span></span><div><small>${escapeHtml(format)} - ${escapeHtml(coverage)}</small><h2>${escapeHtml(name)}</h2><p>${escapeHtml(description)}</p><footer><em>${escapeHtml(updated)}</em><a href="${escapeHtml(href)}">Open ↗</a></footer></div></article>`).join('');
+  }
+
+  function statusCount(value) {
+    if (value === 'completed') return [model.results?.latest, ...(model.results?.history || [])].filter(Boolean).length;
+    if (value === 'live' || value === 'upcoming') return 0;
+    return '—';
+  }
+
+  function syncStatusFilters() {
+    const active = statusFilter?.value || 'all';
+    document.querySelectorAll('.intel-status-item').forEach((button) => {
+      const selected = button.dataset.statusValue === active;
+      button.classList.toggle('is-active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    const liveCount = document.getElementById('intel-status-live-count');
+    const upcomingCount = document.getElementById('intel-status-upcoming-count');
+    const completedCount = document.getElementById('intel-status-completed-count');
+    const allCount = document.getElementById('intel-status-all-count');
+    if (liveCount) liveCount.textContent = String(statusCount('live'));
+    if (upcomingCount) upcomingCount.textContent = String(statusCount('upcoming'));
+    if (completedCount) completedCount.textContent = String(statusCount('completed'));
+    if (allCount) allCount.textContent = String(statusCount('all'));
+  }
+
+  function setStatusFilter(value) {
+    if (!statusFilter) return;
+    statusFilter.value = value;
+    statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    syncStatusFilters();
   }
 
   function populateStateFilter() {
@@ -293,6 +510,8 @@
       model.polling = polling;
       model.stateRows = (population.statePopulation || []).filter((row) => String(row.state).toLowerCase() !== 'total');
       populateStateFilter();
+      setupComboboxes();
+      syncStatusFilters();
       renderKpis();
       renderActivity();
       renderPopulation();
@@ -308,6 +527,7 @@
         renderCandidatesAndParties();
         renderAnalysis();
         renderDataCatalogue();
+        syncStatusFilters();
       } catch (resultsError) {
         const notice = document.getElementById('intel-country-notice');
         notice.hidden = false;
@@ -331,11 +551,19 @@
   navigationButtons.forEach((button) => button.addEventListener('click', () => showSection(button.dataset.intelSection)));
   document.querySelector('[data-intel-mobile-nav]')?.addEventListener('click', () => body.classList.toggle('intel-mobile-nav-open'));
   stateFilter.addEventListener('change', () => updateMapSelection(stateFilter.value, true));
-  [yearFilter, typeFilter, statusFilter].forEach((filter) => filter.addEventListener('change', renderElections));
+  [yearFilter, typeFilter, statusFilter].forEach((filter) => filter.addEventListener('change', () => {
+    renderElections();
+    syncStatusFilters();
+  }));
+  document.querySelectorAll('.intel-status-item').forEach((button) => button.addEventListener('click', () => setStatusFilter(button.dataset.statusValue || 'all')));
   document.getElementById('intel-reset-map').addEventListener('click', () => updateMapSelection('all', true));
   document.getElementById('intel-reset-filters').addEventListener('click', () => {
-    stateFilter.value = 'all'; yearFilter.value = 'all'; typeFilter.value = 'all'; statusFilter.value = 'all';
-    updateMapSelection('all', true); renderElections();
+    [countryFilter, stateFilter, yearFilter, typeFilter, statusFilter].forEach((filter) => {
+      if (!filter) return;
+      filter.value = filter.options?.[0]?.value || 'all';
+      filter.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    syncStatusFilters();
   });
   showSection(pageParameters.get('section') || 'overview');
   initialize();

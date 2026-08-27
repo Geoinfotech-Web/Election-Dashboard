@@ -45,6 +45,72 @@
       </header>
 
       <aside class="intel-sidebar">
+        <section class="intel-filterbar" aria-label="Dashboard filters">
+          <div class="intel-filterbar-heading">
+            <strong>Filters</strong>
+            <button id="intel-reset-filters" type="button">Reset</button>
+          </div>
+          <div class="intel-filter-group">
+            <label class="intel-filter-field" for="intel-state-filter">
+              <span>Region</span>
+              <select id="intel-state-filter">
+                <option value="all">All regions</option>
+              </select>
+            </label>
+            <label class="intel-filter-field" for="intel-country-filter">
+              <span>Country</span>
+              <select id="intel-country-filter">
+                <option value="NG">All countries</option>
+              </select>
+            </label>
+            <label class="intel-filter-field" for="intel-year-filter">
+              <span>Year</span>
+              <select id="intel-year-filter">
+                <option value="all">All years</option>
+                <option value="2026">2026</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022</option>
+                <option value="2019">2019</option>
+              </select>
+            </label>
+            <label class="intel-filter-field" for="intel-type-filter">
+              <span>Election type</span>
+              <select id="intel-type-filter">
+                <option value="all">All types</option>
+                <option>Presidential</option>
+                <option>Governorship</option>
+                <option>Legislative</option>
+                <option>Local</option>
+              </select>
+            </label>
+          </div>
+          <div class="intel-status-group" aria-label="Election status filters">
+            <button class="intel-status-item" type="button" data-status-value="live">
+              <span class="intel-status-dot is-live"></span>
+              <b>Live now</b>
+              <small id="intel-status-live-count">0</small>
+              <i aria-hidden="true">☑</i>
+            </button>
+            <button class="intel-status-item" type="button" data-status-value="upcoming">
+              <span class="intel-status-dot is-upcoming"></span>
+              <b>Upcoming</b>
+              <small id="intel-status-upcoming-count">0</small>
+              <i aria-hidden="true">☑</i>
+            </button>
+            <button class="intel-status-item" type="button" data-status-value="completed">
+              <span class="intel-status-dot is-completed"></span>
+              <b>Recent result</b>
+              <small id="intel-status-completed-count">0</small>
+              <i aria-hidden="true">☑</i>
+            </button>
+            <button class="intel-status-item" type="button" data-status-value="all">
+              <span class="intel-status-dot is-none"></span>
+              <b>No data</b>
+              <small id="intel-status-all-count">—</small>
+              <i aria-hidden="true">☑</i>
+            </button>
+          </div>
+        </section>
         <div class="intel-sidebar-bottom">
           <a class="intel-admin-link" href="admin.html"><span>▣</span><div><b>Administration</b><small>Restricted access</small></div><i>›</i></a>
           <div class="intel-country-chip"><img src="assets/flags/ng.png" alt="Nigeria flag" /><span><b>Nigeria</b><small>Current country</small></span></div>
@@ -53,26 +119,6 @@
 
       <main id="intel-content" class="intel-content">
         <div id="intel-country-notice" class="intel-country-notice" hidden></div>
-        <header class="intel-page-header">
-          <div>
-            <p id="intel-kicker">Nigeria · National overview</p>
-            <h1 id="intel-page-title">Election intelligence</h1>
-            <span id="intel-page-description">A source-aware view of electoral geography, participation, population, and available results.</span>
-          </div>
-          <div class="intel-header-links">
-            <a href="gateway.html">Change country</a>
-            <button class="intel-mobile-nav-toggle" type="button" data-intel-mobile-nav aria-label="Open dashboard navigation">Menu</button>
-          </div>
-        </header>
-
-        <section class="intel-filterbar" aria-label="Dashboard filters">
-          <label><span>Country</span><select id="intel-country-filter"><option value="NG">Nigeria</option></select></label>
-          <label><span>State</span><select id="intel-state-filter"><option value="all">All states &amp; FCT</option></select></label>
-          <label><span>Year</span><select id="intel-year-filter"><option value="all">All available years</option><option>2026</option><option>2023</option><option>2022</option><option>2019</option></select></label>
-          <label><span>Election type</span><select id="intel-type-filter"><option value="all">All election types</option><option>Presidential</option><option>Governorship</option><option>Legislative</option><option>Local</option></select></label>
-          <label><span>Status</span><select id="intel-status-filter"><option value="all">All statuses</option><option value="live">Live</option><option value="upcoming">Upcoming</option><option value="completed">Completed</option></select></label>
-          <button id="intel-reset-filters" type="button">Reset</button>
-        </section>
 
         <section class="intel-view is-active" data-intel-view="overview">
           <div id="intel-kpi-grid" class="intel-kpi-grid" aria-label="Nigeria election summary"></div>
@@ -84,8 +130,6 @@
               </header>
               <div class="intel-map-stage">
                 <div id="intel-election-map" aria-label="Interactive map of Nigeria states"></div>
-                <div class="intel-map-legend"><strong>Population</strong><span><i class="scale-one"></i>Lower</span><span><i class="scale-two"></i>Medium</span><span><i class="scale-three"></i>Higher</span></div>
-                <div id="intel-map-selection" class="intel-map-selection"><p>Selected geography</p><strong>Nigeria</strong><span>Choose a state on the map to drill down.</span></div>
               </div>
             </article>
             <aside class="intel-activity-rail">
